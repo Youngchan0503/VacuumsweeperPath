@@ -7,6 +7,8 @@ let allVehicles = [];
 let allRoutes = [];
 let selectedDistrict = null;
 let selectedDongName = null;
+let selectedRouteId = null;
+let currentAirDate = null; // null이면 현재 실시간(오늘) 날짜 자동 사용
 let currentMasterView = 'clean'; // 'clean' (일반/다크 도로 지도), 'satellite' (고해상도 위성사진)
 let currentNaverBaseMap = 'clean'; // 'clean' 또는 'satellite'
 let currentStationCode = '701'; // 기본: 수창동(중구)
@@ -20,21 +22,25 @@ let leafletMapInstance = null;
 let darkOSMTileLayer = null;
 let esriSatelliteTileLayer = null;
 let leafletDongLayer = null;
+let selectedDongHighlightLayer = null; // 선택된 동 전용 최상단 네온 SVG 하이라이트 레이어
 let leafletRouteLayerGroup = null;
 let leafletRoutePolylines = [];
 let daeguDongGeoJsonData = null;
 let currentlyHoveredDongLayer = null;
 
-// 마우스 드래그 & 클릭 판별 제어 상태 변수 (홀드/드래그 시 툴팁 잔류 방지)
+// 마우스 드래그 & 클릭 판별 제어 상태 변수
 let isMapMouseDown = false;
 let isMapDragging = false;
 let mapMouseDownTime = 0;
 let mapMouseDownPos = null;
 let lastDragEndTime = 0;
+let justClickedDong = false; // 동 클릭 시 맵 전역 초기화 이벤트 방지 플래그
 
 function dismissAllTooltipsAndHovers() {
   if (currentlyHoveredDongLayer) {
-    if (leafletDongLayer) {
+    if (currentlyHoveredDongLayer.feature) {
+      currentlyHoveredDongLayer.setStyle(getDongStyle(currentlyHoveredDongLayer.feature));
+    } else if (leafletDongLayer) {
       leafletDongLayer.resetStyle(currentlyHoveredDongLayer);
     }
     currentlyHoveredDongLayer.closeTooltip();
@@ -269,28 +275,98 @@ async function loadDaeguDongGeoJson() {
   }
 }
 
-// 동 폴리곤 스타일 계산 (미세먼지 좋음/보통/나쁨/매우나쁨 등급 기반 컬러링)
+// 선택된 동 또는 자치구의 실제 행정구역 SVG 경계선 전용 최상단 네온 하이라이트 오버레이
+function updateDongHighlightOverlay(districtName, dongName = null) {
+  if (!leafletMapInstance || !daeguDongGeoJsonData) return;
+
+  // 기존 하이라이트 오버레이 제거
+  if (selectedDongHighlightLayer && leafletMapInstance.hasLayer(selectedDongHighlightLayer)) {
+    leafletMapInstance.removeLayer(selectedDongHighlightLayer);
+    selectedDongHighlightLayer = null;
+  }
+
+  // 타겟 Feature(들) 필터링 (공백 및 특수문자 안전 처리)
+  let targetFeatures = [];
+  if (dongName) {
+    // 특정 동 선택 시: 해당 1개 동의 실제 SVG 곡선 경계선
+    targetFeatures = daeguDongGeoJsonData.features.filter(f => {
+      if (!f.properties) return false;
+      const fDist = (f.properties.district || '').trim();
+      const fDong = (f.properties.dong || '').trim();
+      const tDist = (districtName || '').trim();
+      const tDong = (dongName || '').trim();
+      return fDist === tDist && (fDong === tDong || fDong.includes(tDong) || tDong.includes(fDong));
+    });
+  } else if (districtName) {
+    // 자치구 전체 선택 시: 해당 자치구 내 동들의 실제 SVG 경계선
+    targetFeatures = daeguDongGeoJsonData.features.filter(f => {
+      if (!f.properties) return false;
+      const fDist = (f.properties.district || '').trim();
+      const tDist = (districtName || '').trim();
+      return fDist === tDist;
+    });
+  }
+
+  if (targetFeatures.length > 0) {
+    selectedDongHighlightLayer = L.geoJSON(targetFeatures, {
+      style: {
+        fill: false,
+        fillOpacity: 0, // 내부는 100% 투명하게 하여 이전 투명도 완벽 보존
+        color: '#38bdf8', // 깔끔하고 선명한 사이언 외곽선
+        weight: 3, // 과하지 않고 또렷한 외곽선 두께
+        opacity: 1,
+        dashArray: '',
+        className: 'selected-dong-neon-path'
+      },
+      interactive: false // 마우스 이벤트는 아래 레이어로 통과
+    });
+
+    selectedDongHighlightLayer.addTo(leafletMapInstance);
+    selectedDongHighlightLayer.bringToFront();
+
+    // 도로망 노선이 항상 최상단에 오도록 유지
+    if (leafletRouteLayerGroup && leafletMapInstance.hasLayer(leafletRouteLayerGroup)) {
+      leafletRouteLayerGroup.bringToFront();
+    }
+  }
+}
+
+// 동 폴리곤 스타일 계산 (미세먼지 좋음/보통/나쁨/매우나쁨 등급 기반 컬러링 및 실제 SVG 테두리 곡선 강조)
 function getDongStyle(feature) {
-  const dist = feature.properties.district;
-  const dong = feature.properties.dong;
-  const isSelectedDong = selectedDongName && dong === selectedDongName;
+  const dist = (feature.properties.district || '').trim();
+  const dong = (feature.properties.dong || '').trim();
+  const isSelectedDong = selectedDongName && (dong === selectedDongName.trim() || dong.includes(selectedDongName.trim())) && (!selectedDistrict || dist === selectedDistrict.trim());
+  const isSelectedDist = selectedDistrict && dist === selectedDistrict.trim();
 
   // 구(Gu) 고유색 대신 자치구의 미세먼지(PM10) 대기질 등급 색상 적용
   const airInfo = currentDistrictAirData[dist] || defaultDistrictAirData[dist] || { pm10: 70, level: 2, text: '보통', color: '#10b981' };
   const airColor = airInfo.color || '#10b981';
 
+  // 1. 특정 동(Dong)이 선택된 경우: 내부 투명도(0.28) 유지 + 사이언 외곽선 강조
   if (isSelectedDong) {
     return {
       fillColor: airColor,
-      fillOpacity: 0.65,
-      color: '#38bdf8', // 선택된 동은 선명한 하늘색 네온 테두리
-      weight: 3.5,
+      fillOpacity: 0.28, // 기존 대기색 투명도(0.28) 그대로 유지!
+      color: '#38bdf8', // 깔끔한 사이언 외곽선
+      weight: 3,        // 절제된 외곽선 두께
       opacity: 1,
       dashArray: ''
     };
   }
 
-  // 대구 전역 미세먼지 대기질 투명 오버레이
+  // 2. 특정 자치구(구/군)가 선택된 경우: 내부 투명도는 기본 투명도(0.28) 유지하고 구 외곽선 강조
+  if (isSelectedDist && !selectedDongName) {
+    return {
+      fillColor: airColor,
+      fillOpacity: 0.28,
+      color: '#38bdf8',
+      weight: 2,
+      opacity: 0.9,
+      dashArray: ''
+    };
+  }
+
+  // 3. 모든 비선택 구역도 옅어지지 않고 동일하게 원래 투명도(0.28) 유지
   return {
     fillColor: airColor,
     fillOpacity: 0.28,
@@ -375,15 +451,17 @@ function onEachDongFeature(feature, layer) {
       currentlyHoveredDongLayer = l;
 
       l.setStyle({
-        fillOpacity: 0.55,
+        fillOpacity: 0.38,
         color: '#ffffff',
-        weight: 2.5,
-        opacity: 1
+        weight: 2,
+        opacity: 0.95
       });
     },
     mouseout: function(e) {
       const l = e.target;
-      if (leafletDongLayer) {
+      if (l.feature) {
+        l.setStyle(getDongStyle(l.feature));
+      } else if (leafletDongLayer) {
         leafletDongLayer.resetStyle(l);
       }
       l.closeTooltip();
@@ -392,29 +470,27 @@ function onEachDongFeature(feature, layer) {
       }
     },
     mousedown: function(e) {
-      isMapMouseDown = true;
       layer._mouseDownTime = Date.now();
       layer._mouseDownPos = e.containerPoint;
-
-      // 마우스를 누른 순간(홀드/드래그 준비) 열려있던 호버 툴팁 및 스타일 즉시 해제
-      dismissAllTooltipsAndHovers();
     },
     click: function(e) {
-      L.DomEvent.stopPropagation(e);
+      if (e.originalEvent) {
+        L.DomEvent.stopPropagation(e);
+      }
 
-      const clickDuration = Date.now() - (layer._mouseDownTime || 0);
+      // 12px 이상 명백히 마우스를 움직였거나 지도 이동 중인 경우만 드래그로 판정하여 무시
       let movedDistance = 0;
       if (layer._mouseDownPos && e.containerPoint) {
         movedDistance = layer._mouseDownPos.distanceTo(e.containerPoint);
       }
-
-      // 드래그가 발생했거나, 드래그 직후이거나, 마우스를 250ms 이상 홀드했거나, 4px 이상 이동했다면 드래그로 판정하여 무시!
-      if (isMapDragging || (Date.now() - lastDragEndTime < 350) || clickDuration > 250 || movedDistance > 4) {
-        dismissAllTooltipsAndHovers();
+      if (isMapDragging || movedDistance > 12) {
         return;
       }
 
-      // 순수한 짧은 클릭일 때만 동 선택 & 상세 카드 표출
+      // 맵 빈 공간 클릭 시 즉각적인 선택 해제 방지 플래그
+      justClickedDong = true;
+      setTimeout(() => { justClickedDong = false; }, 350);
+
       dismissAllTooltipsAndHovers();
       selectDistrictAndDong(dist, dong, fullName);
     }
@@ -552,11 +628,15 @@ function updateNaverControlsUI() {
 // --------------------------------------------------------------------------
 // 4. 대구 실시간 대기정보(air.daegu.go.kr) 크롤링 데이터 조회 및 렌더링
 // --------------------------------------------------------------------------
-async function fetchAirData(sttnCd = '701', force = false) {
+async function fetchAirData(sttnCd = '701', dateStr = undefined, force = false) {
   currentStationCode = sttnCd;
+  if (dateStr !== undefined) {
+    currentAirDate = dateStr;
+  }
 
   try {
-    const res = await fetch(`/api/air/realtime?sttn_cd=${sttnCd}&date=2026-10-01`);
+    const query = currentAirDate ? `sttn_cd=${sttnCd}&date=${encodeURIComponent(currentAirDate)}` : `sttn_cd=${sttnCd}`;
+    const res = await fetch(`/api/air/realtime?${query}`);
     const result = await res.json();
 
     if (result.success && result.data) {
@@ -642,6 +722,16 @@ function updateAirUi(airData) {
   if (modalSttnSelect && modalSttnSelect.value !== airData.sttn_cd) {
     modalSttnSelect.value = airData.sttn_cd;
   }
+
+  // 4. 조회 일자 인풋 및 공식 사이트 원문 링크 동적 갱신
+  const dateInput = document.getElementById('modal-date-input');
+  if (dateInput && airData.date) {
+    dateInput.value = airData.date;
+  }
+  const officialLink = document.querySelector('.official-link');
+  if (officialLink && airData.date) {
+    officialLink.href = `https://air.daegu.go.kr/index.do?menu_id=00000801&menu_link=%2Ffront%2FrealTimeAir%2FrealTimeTotalAirView.do&sttn_cd=${airData.sttn_cd || '701'}&from=${airData.date}&fromtime=00&to=${airData.date}&totime=23`;
+  }
 }
 
 function renderAirTable(records) {
@@ -683,11 +773,21 @@ function renderAirTable(records) {
   `).join('');
 }
 
-function openAirModal() {
+async function openAirModal() {
   const modal = document.getElementById('air-modal');
   if (modal) {
     modal.style.display = 'flex';
     lucide.createIcons();
+  }
+  // Fetch real-time overall district air summary and render
+  try {
+    const res = await fetch('/api/air/districts');
+    const result = await res.json();
+    if (result.success && result.districts) {
+      renderDistrictSummary(Object.values(result.districts));
+    }
+  } catch (err) {
+    console.error('District summary fetch failed:', err);
   }
 }
 
@@ -696,12 +796,32 @@ function closeAirModal() {
   if (modal) modal.style.display = 'none';
 }
 
+function renderDistrictSummary(districts) {
+  const tbody = document.getElementById('district-summary-tbody');
+  if (!tbody) return;
+  const rows = districts.map(d => {
+    const gradeText = d.text || '';
+    const color = d.color || '#10b981';
+    return `
+      <tr>
+        <td>${d.district}</td>
+        <td>${d.pm10}</td>
+        <td><span class="qm-tag" style="background:${color}25;color:${color};border:1px solid ${color}60;">
+          ${gradeText}
+        </span></td>
+      </tr>`;
+  }).join('');
+  tbody.innerHTML = rows;
+}
+
+
 // --------------------------------------------------------------------------
 // 5. 구·군 및 동 단위 통합 선택 & 지도 동기화
 // --------------------------------------------------------------------------
 function selectDistrict(districtName, routeId = null) {
   selectedDistrict = districtName;
   selectedDongName = null;
+  selectedRouteId = routeId;
 
   // 좌측 드롭다운 동기화
   const selectEl = document.getElementById('district-filter');
@@ -725,18 +845,22 @@ function selectDistrict(districtName, routeId = null) {
   // 우측 하단 상세 카드 렌더링
   renderDetailCard(districtName, null, `대구광역시 ${districtName} 관제 권역`, routeId);
 
+  // 선택된 자치구의 실제 SVG 경계선 전용 최상단 네온 오버레이 반영
+  updateDongHighlightOverlay(districtName, null);
+
   // Leaflet 동 폴리곤 스타일 갱신
   if (leafletDongLayer) {
     leafletDongLayer.setStyle(getDongStyle);
   }
 
-  // Leaflet 도로망 노선 스타일 갱신 및 포커싱
-  highlightLeafletDistrict(districtName);
+  // Leaflet 도로망 노선 스타일 갱신 및 포커싱 (단일 노선 선택 시 해당 노선만 단독 강조)
+  highlightLeafletDistrict(districtName, routeId, true);
 }
 
 function selectDistrictAndDong(districtName, dongName, fullName, routeId = null) {
   selectedDistrict = districtName;
   selectedDongName = dongName;
+  selectedRouteId = routeId;
 
   // 좌측 드롭다운 동기화
   const selectEl = document.getElementById('district-filter');
@@ -760,22 +884,35 @@ function selectDistrictAndDong(districtName, dongName, fullName, routeId = null)
   // 우측 하단 상세 카드 렌더링
   renderDetailCard(districtName, dongName, fullName, routeId);
 
-  // Leaflet 동 폴리곤 스타일 갱신
+  // 선택된 동의 실제 SVG 곡선 경계선 전용 최상단 네온 오버레이 표출
+  updateDongHighlightOverlay(districtName, dongName);
+
+  // Leaflet 동 폴리곤 스타일 갱신 및 선택된 동을 최상단으로 올림
+  if (leafletDongLayer) {
+    leafletDongLayer.setStyle(getDongStyle);
+    leafletDongLayer.eachLayer(l => {
+      if (l.feature && l.feature.properties && l.feature.properties.dong === dongName) {
+        l.bringToFront();
+      }
+    });
+  }
+
+  // Leaflet 도로망 노선 스타일 갱신 (동 클릭 시에는 카메라 강제 줌아웃 방지)
+  highlightLeafletDistrict(districtName, routeId, false);
+}
+
+function highlightLeafletDistrict(districtName, targetRouteId = null, shouldFitBounds = true) {
+  if (!leafletMapInstance) return;
+
+  // 동 폴리곤 스타일 동기화 (선택된 구의 실제 SVG 경계선 테두리 강조)
   if (leafletDongLayer) {
     leafletDongLayer.setStyle(getDongStyle);
   }
 
-  // Leaflet 도로망 노선 스타일 갱신 및 포커싱
-  highlightLeafletDistrict(districtName);
-}
-
-function highlightLeafletDistrict(districtName) {
-  if (!leafletMapInstance) return;
-
   const distBounds = [];
 
-  // 1. 행정구역 동 레이어에서 해당 자치구 영역 바운드 추출
-  if (leafletDongLayer) {
+  // 1. 행정구역 동 레이어에서 해당 자치구 영역 바운드 추출 (단일 노선 선택이 아닐 때만 자치구 바운드 사용)
+  if (!targetRouteId && leafletDongLayer && shouldFitBounds) {
     leafletDongLayer.eachLayer(layer => {
       if (layer.feature && layer.feature.properties && layer.feature.properties.district === districtName) {
         const b = layer.getBounds();
@@ -788,20 +925,35 @@ function highlightLeafletDistrict(districtName) {
   // 2. 도로망 노선 스타일 갱신
   if (leafletRoutePolylines && leafletRoutePolylines.length > 0) {
     leafletRoutePolylines.forEach(p => {
-      if (p.routeData && p.routeData.district && p.routeData.district.includes(districtName)) {
-        p.setStyle({ color: '#10b981', weight: 7, opacity: 1 });
-        p.bringToFront();
-        if (p.routeData.points) {
-          p.routeData.points.forEach(pt => distBounds.push(L.latLng(pt[0], pt[1])));
+      // [중요] 특정 노선을 직접 클릭한 경우: 오직 그 1개 노선만 단독 강조!
+      if (targetRouteId) {
+        if (p.routeData && p.routeData.id === targetRouteId) {
+          p.setStyle({ color: '#c084fc', weight: 8.5, opacity: 1 });
+          p.bringToFront();
+          if (p.routeData.points && shouldFitBounds) {
+            p.routeData.points.forEach(pt => distBounds.push(L.latLng(pt[0], pt[1])));
+          }
+        } else {
+          // 다른 모든 노선은 딤드(은은하게) 처리
+          p.setStyle({ color: '#7e22ce', weight: 3.5, opacity: 0.35 });
         }
       } else {
-        p.setStyle({ color: '#10b981', weight: 4.5, opacity: 0.85 });
+        // 좌측 자치구 필터를 클릭한 경우: 해당 자치구 권역 노선 강조
+        if (p.routeData && p.routeData.district && p.routeData.district.includes(districtName)) {
+          p.setStyle({ color: '#c084fc', weight: 7.5, opacity: 1 });
+          p.bringToFront();
+          if (p.routeData.points && shouldFitBounds) {
+            p.routeData.points.forEach(pt => distBounds.push(L.latLng(pt[0], pt[1])));
+          }
+        } else {
+          p.setStyle({ color: '#7e22ce', weight: 4, opacity: 0.55 });
+        }
       }
     });
   }
 
-  // 3. 해당 권역으로 부드럽게 화면 이동
-  if (distBounds.length > 0 && leafletMapInstance) {
+  // 3. 해당 노선 또는 권역으로 부드럽게 화면 이동 (shouldFitBounds가 true일 때만)
+  if (shouldFitBounds && distBounds.length > 0 && leafletMapInstance) {
     leafletMapInstance.fitBounds(L.latLngBounds(distBounds), { padding: [60, 60], maxZoom: 14 });
   }
 }
@@ -815,8 +967,14 @@ function renderDetailCard(districtName, dongName = null, fullName = null, routeI
 
   if (!card) return;
 
-  const vehicle = allVehicles.find(v => v.district === districtName) || allVehicles[0];
-  const route = routeId ? (allRoutes.find(r => r.id === routeId) || allRoutes.find(r => r.district.includes(districtName))) : (allRoutes.find(r => r.district.includes(districtName)) || allRoutes[0]);
+  const vehicle = allVehicles.find(v => v.district === districtName) || allVehicles[0] || {
+    name: `${districtName} 관제차량`,
+    model: '16톤 친환경 분진흡입차',
+    improvement: { distance_reduction_pct: 18.4, duration_reduction_pct: 22.1, pm10_reduction_pct: 35.8, dust_efficiency_gain_pct: 28.5 },
+    before_stats: { distance_km: 42.5, duration_min: 165, pm10_avg_after: 48 },
+    after_stats: { distance_km: 34.7, duration_min: 128, pm10_avg_after: 31, dust_collected_kg: 84.5 }
+  };
+  const route = routeId ? (allRoutes.find(r => r.id === routeId) || allRoutes.find(r => r.district && r.district.includes(districtName))) : (allRoutes.find(r => r.district && r.district.includes(districtName)) || allRoutes[0]);
 
   tag.textContent = fullName ? fullName : `대구광역시 ${districtName} 관제 권역`;
   title.textContent = dongName ? `${districtName} ${dongName}` : (vehicle ? vehicle.name : `${districtName} 관리구역`);
@@ -856,7 +1014,9 @@ function renderDetailCard(districtName, dongName = null, fullName = null, routeI
   }
 
   card.style.display = 'block';
-  lucide.createIcons();
+  if (window.lucide) {
+    lucide.createIcons();
+  }
 }
 
 function closeDetailCard() {
@@ -867,6 +1027,13 @@ function closeDetailCard() {
 function resetSelection() {
   selectedDistrict = null;
   selectedDongName = null;
+  selectedRouteId = null;
+
+  // 선택된 동/구 최상단 네온 하이라이트 오버레이 제거
+  if (selectedDongHighlightLayer && leafletMapInstance && leafletMapInstance.hasLayer(selectedDongHighlightLayer)) {
+    leafletMapInstance.removeLayer(selectedDongHighlightLayer);
+    selectedDongHighlightLayer = null;
+  }
 
   const selectEl = document.getElementById('district-filter');
   if (selectEl) selectEl.value = 'all';
@@ -881,7 +1048,7 @@ function resetSelection() {
   if (leafletMapInstance && leafletRoutePolylines && leafletRoutePolylines.length > 0) {
     const allBounds = [];
     leafletRoutePolylines.forEach(p => {
-      p.setStyle({ color: '#10b981', weight: 5, opacity: 0.88 });
+      p.setStyle({ color: '#a855f7', weight: 5.2, opacity: 0.9 });
       if (p.routeData && p.routeData.points) {
         p.routeData.points.forEach(pt => allBounds.push(pt));
       }
@@ -940,10 +1107,11 @@ function initRoadLeafletMap() {
     if (route.points && route.points.length > 0) {
       route.points.forEach(pt => allBounds.push(pt));
 
+      // 대기현황 색상(파랑/초록/주황/빨강)과 뚜렷이 구별되는 네온 바이올렛(#a855f7)
       const poly = L.polyline(route.points, {
-        color: '#10b981',
-        weight: 5,
-        opacity: 0.88,
+        color: '#a855f7',
+        weight: 5.2,
+        opacity: 0.9,
         lineJoin: 'round',
         lineCap: 'round'
       });
@@ -952,7 +1120,7 @@ function initRoadLeafletMap() {
 
       const popupHtml = `
         <div style="min-width: 220px; font-family: inherit;">
-          <div style="font-size: 0.95rem; font-weight: 700; color: #10b981; margin-bottom: 4px;">
+          <div style="font-size: 0.95rem; font-weight: 700; color: #c084fc; margin-bottom: 4px;">
             ${route.name}
           </div>
           <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 8px;">
@@ -980,10 +1148,24 @@ function initRoadLeafletMap() {
 
       poly.on('mouseover', function () {
         if (isMapMouseDown || isMapDragging) return;
-        this.setStyle({ color: '#38bdf8', weight: 8, opacity: 1 });
+        this.setStyle({ color: '#ffffff', weight: 8, opacity: 1 });
       });
       poly.on('mouseout', function () {
-        this.setStyle({ color: '#10b981', weight: 4.5, opacity: 0.85 });
+        if (selectedRouteId) {
+          if (this.routeData && this.routeData.id === selectedRouteId) {
+            this.setStyle({ color: '#c084fc', weight: 8.5, opacity: 1 });
+          } else {
+            this.setStyle({ color: '#7e22ce', weight: 3.5, opacity: 0.35 });
+          }
+        } else if (selectedDistrict) {
+          if (this.routeData && this.routeData.district && this.routeData.district.includes(selectedDistrict)) {
+            this.setStyle({ color: '#c084fc', weight: 7.5, opacity: 1 });
+          } else {
+            this.setStyle({ color: '#7e22ce', weight: 4, opacity: 0.55 });
+          }
+        } else {
+          this.setStyle({ color: '#a855f7', weight: 5.2, opacity: 0.9 });
+        }
       });
       poly.on('mousedown', function (e) {
         this._mouseDownTime = Date.now();
@@ -998,9 +1180,12 @@ function initRoadLeafletMap() {
         if (isMapDragging || duration > 280 || dist > 5) {
           return;
         }
+        selectedRouteId = route.id;
         if (route.district) {
           const firstDist = route.district.split('/')[0];
           selectDistrict(firstDist, route.id);
+        } else {
+          highlightLeafletDistrict(null, route.id);
         }
       });
 
@@ -1042,14 +1227,15 @@ function initRoadLeafletMap() {
     }, 120);
   });
 
-  // 지도 빈 공간 클릭 시 선택 초기화
+  // 지도 빈 공간 클릭 시 선택 초기화 (동 폴리곤 클릭 시에는 무시)
   leafletMapInstance.on('click', (e) => {
+    if (justClickedDong) return;
     const elapsed = Date.now() - mapMouseDownTime;
     let dist = 0;
     if (mapMouseDownPos && e.containerPoint) {
       dist = mapMouseDownPos.distanceTo(e.containerPoint);
     }
-    if (!isMapDragging && (Date.now() - lastDragEndTime >= 350) && elapsed < 250 && dist < 5) {
+    if (!isMapDragging && (Date.now() - lastDragEndTime >= 250) && elapsed < 300 && dist < 10) {
       resetSelection();
     }
   });
@@ -1064,12 +1250,12 @@ function initRoadLeafletMap() {
 
   window.addEventListener('mouseup', () => {
     isMapMouseDown = false;
-    lastDragEndTime = Date.now();
+    // lastDragEndTime은 실제 dragend 이벤트에서만 갱신 (일반 클릭 오판 방지)
     dismissAllTooltipsAndHovers();
     setTimeout(() => {
       isMapDragging = false;
       dismissAllTooltipsAndHovers();
-    }, 120);
+    }, 100);
   }, true);
 
   // 지도 컨테이너 자체에서 마우스가 나갔을 때 툴팁 정리
@@ -1110,9 +1296,28 @@ function setupEventListeners() {
   const modalStationSelect = document.getElementById('modal-station-select');
   if (modalStationSelect) {
     modalStationSelect.addEventListener('change', (e) => {
-      fetchAirData(e.target.value);
+      fetchAirData(e.target.value, currentAirDate);
     });
   }
+
+  // 모달 내 조회 일자 직접 선택
+  const modalDateInput = document.getElementById('modal-date-input');
+  if (modalDateInput) {
+    modalDateInput.addEventListener('change', (e) => {
+      if (e.target.value) {
+        fetchAirData(currentStationCode, e.target.value);
+      }
+    });
+  }
+
+  // 5분마다 실시간 대기 데이터 자동 백그라운드 갱신 (날짜가 바뀌면 자정 이후 자동 전환)
+  setInterval(() => {
+    // 특정 과거 날짜를 조회 중인 상태가 아니라면(실시간 모드) 최신 데이터 자동 폴링
+    if (!currentAirDate) {
+      fetchAirData(currentStationCode);
+      fetchDistrictAirData();
+    }
+  }, 300000);
 
 
 

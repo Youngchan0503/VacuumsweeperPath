@@ -4,7 +4,7 @@ import ssl
 import urllib.request
 import urllib.parse
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 import config
 
 # 캐시 저장소
@@ -76,9 +76,11 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
     """
     대구광역시 실시간 대기정보 시스템 크롤링
     대상 URL: https://air.daegu.go.kr/front/realTimeAir/realTimeTotalAirView.do
+    date_str 미지정 시 현재 날짜(오늘, YYYY-MM-DD)를 동적으로 조회합니다.
     """
+    today_str = datetime.now().strftime('%Y-%m-%d')
     if not date_str:
-        date_str = '2026-10-01'
+        date_str = today_str
 
     cache_key = f"{sttn_cd}_{date_str}"
     now_ts = datetime.now().timestamp()
@@ -181,6 +183,16 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
             'so2': {'grade': so2_grade, 'value': so2_val},
             'no2': {'grade': no2_grade, 'value': no2_val}
         })
+
+    # 당일 새벽(00~01시) 등으로 아직 관측 데이터가 올라오지 않은 경우 전일(어제) 최종 데이터로 안전 폴백
+    if not parsed_records and date_str == today_str:
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        print(f"[AirCrawler] 당일({today_str}) 데이터 준비 중: 전일({yesterday_str}) 데이터 폴백 호출")
+        fallback_data = crawl_daegu_realtime_air(sttn_cd=sttn_cd, date_str=yesterday_str)
+        if fallback_data.get('records'):
+            fallback_data['date'] = today_str
+            fallback_data['is_fallback'] = True
+            return fallback_data
 
     latest_rec = parsed_records[-1] if parsed_records else None
 

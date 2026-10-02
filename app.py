@@ -40,7 +40,7 @@ def api_vehicles():
 def api_air_realtime():
     """대구광역시 실시간 대기정보 크롤링 API (air.daegu.go.kr)"""
     sttn_cd = request.args.get('sttn_cd', '701')
-    date_str = request.args.get('date', '2026-10-01')
+    date_str = request.args.get('date')  # 파라미터 미지정 시 오늘 날짜 자동 적용
     data = collector.crawl_daegu_realtime_air(sttn_cd=sttn_cd, date_str=date_str)
     return jsonify({'success': True, 'data': data})
 

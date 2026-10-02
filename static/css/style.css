@@ -315,6 +315,13 @@ html, body {
   top: 0;
   background: var(--bg-card);
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-header:hover {
+  background: var(--bg-card-hover);
 }
 
 .panel-title {
@@ -332,11 +339,57 @@ html, body {
   height: 15px;
 }
 
+/* 패널 접기/펼치기 버튼 */
+.panel-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent-blue);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.panel-collapse-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.panel-collapse-btn i {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 패널 바디 접기 애니메이션 */
 .panel-body {
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 800px;
+  opacity: 1;
+}
+
+.panel-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* 패널 접힌 상태에서 border-bottom 제거 */
+.panel-header.collapsed-header {
+  border-bottom-color: transparent;
 }
 
 .control-group {
@@ -546,6 +599,13 @@ html, body {
   width: 12px;
   height: 12px;
   border-radius: 3px;
+}
+
+.legend-box-line {
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+  display: inline-block;
 }
 
 .bg-svg-default { background: #1e293b; }
@@ -985,6 +1045,21 @@ html, body {
   color: #10b981;
 }
 
+/* 도로망 노선 레이어 버튼은 보라색 네온으로 차별화 */
+#nft-layer-route.active {
+  background: rgba(168, 85, 247, 0.16);
+  border-color: rgba(168, 85, 247, 0.45);
+}
+
+#nft-layer-route.active .nft-dot {
+  background: #a855f7;
+  box-shadow: 0 0 8px #a855f7;
+}
+
+#nft-layer-route.active .nft-layer-icon {
+  color: #c084fc;
+}
+
 /* 동 폴리곤 툴팁 스타일 */
 .dong-leaflet-tooltip {
   background: rgba(15, 23, 42, 0.94) !important;
@@ -1009,6 +1084,41 @@ html, body {
 }
 .dong-poly:hover {
   filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+}
+
+/* Leaflet SVG 패스 클릭 시 브라우저 기본 사각형 outline 완전 차단 */
+path.leaflet-interactive,
+.leaflet-interactive,
+.leaflet-container path,
+svg path {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+path.leaflet-interactive:focus,
+.leaflet-interactive:focus,
+svg path:focus {
+  outline: none !important;
+}
+
+/* SVG 실제 경계선(stroke) 렌더링 최적화 및 부드러운 전환 */
+path.leaflet-interactive {
+  transition: stroke 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              stroke-width 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              fill-opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 선택된 동 실제 SVG 경계선 테두리 강조 (절제되고 깔끔한 하이라이트) */
+.selected-dong-neon-path,
+path.selected-dong-neon-path {
+  filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.5)) !important;
+  stroke: #38bdf8 !important;
+  stroke-width: 3px !important;
+  stroke-linejoin: round !important;
+  stroke-linecap: round !important;
+  fill: none !important;
+  fill-opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* 3. 우측 하단 상세 정보 카드 */

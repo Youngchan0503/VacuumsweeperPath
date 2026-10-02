@@ -46,10 +46,23 @@
       if (card) card.style.display = 'none';
       if (typeof window._realCloseDetailCard === 'function') window._realCloseDetailCard();
     };
+    window.toggleAirPanel = function() {
+      const body = document.getElementById('air-panel-body');
+      const icon = document.getElementById('panel-collapse-icon');
+      const header = document.getElementById('panel-toggle-header');
+      if (!body) return;
+      const isCollapsed = body.classList.toggle('collapsed');
+      if (icon) {
+        icon.style.transform = isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
+      if (header) {
+        header.classList.toggle('collapsed-header', isCollapsed);
+      }
+    };
   </script>
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261002_float_lg" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261002_float_lg';">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261002_soft_border_v4" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261002_soft_border_v4';">
 </head>
 <body>
 
@@ -106,14 +119,17 @@
 
     <!-- 2. 좌측 플로팅 패널 -->
     <aside class="floating-panel" id="control-panel">
-      <div class="panel-header">
+      <div class="panel-header" id="panel-toggle-header" onclick="toggleAirPanel()" style="cursor:pointer; user-select:none;">
         <div class="panel-title">
           <i data-lucide="activity"></i>
           <span id="panel-title-text">대구 실시간 대기현황</span>
         </div>
+        <button class="panel-collapse-btn" id="panel-collapse-btn" title="패널 접기/펼치기" onclick="event.stopPropagation(); toggleAirPanel()">
+          <i data-lucide="chevron-up" id="panel-collapse-icon"></i>
+        </button>
       </div>
 
-      <div class="panel-body">
+      <div class="panel-body" id="air-panel-body">
         <!-- 실시간 측정소 선택 셀렉트 -->
         <div class="control-group">
           <label class="control-label" for="station-select">
@@ -181,7 +197,7 @@
           </button>
         </div>
 
-        <!-- 지도 범례: 미세먼지(PM10) 대기질 등급 -->
+        <!-- 지도 범례: 미세먼지(PM10) 대기질 등급 & 관제 도로망 -->
         <div class="legend-box" id="map-legend">
           <div class="legend-title">미세먼지(PM10) 대기질 범례</div>
           <div class="legend-item">
@@ -199,6 +215,11 @@
           <div class="legend-item">
             <span class="legend-box-color" style="background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);"></span>
             <span>매우나쁨 (151 ㎍/㎥ ~)</span>
+          </div>
+          <div style="height: 1px; background: var(--bg-border); margin: 3px 0;"></div>
+          <div class="legend-item">
+            <span class="legend-box-line" style="background: #a855f7; box-shadow: 0 0 8px rgba(168, 85, 247, 0.85);"></span>
+            <span style="color: #f1f5f9; font-weight: 600;">분진차량 운행 도로망</span>
           </div>
         </div>
       </div>
@@ -272,6 +293,10 @@
 
           <div class="amh-controls">
             <div class="modal-sttn-select">
+              <label for="modal-date-input"><i data-lucide="calendar" style="width:13px; height:13px; vertical-align:middle;"></i> 조회일자:</label>
+              <input type="date" id="modal-date-input" class="custom-select" style="width: auto; padding: 4px 8px; font-size: 0.76rem; cursor: pointer;" title="조회 날짜 선택 (변경 시 해당 날짜 데이터 실시간 크롤링)">
+            </div>
+            <div class="modal-sttn-select">
               <label for="modal-station-select">측정소:</label>
               <select id="modal-station-select" class="custom-select" style="width: auto;">
                 <option value="701">701 수창동(중구)</option>
@@ -291,7 +316,11 @@
                 <option value="803">803 이곡동(달서구)</option>
               </select>
             </div>
-            <button class="action-btn" onclick="fetchAirData(currentStationCode, true)" title="실시간 데이터 새로고침">
+            <button class="action-btn" id="btn-air-today" onclick="fetchAirData(currentStationCode, null, true)" title="오늘 최신 실시간 데이터로 복귀">
+              <i data-lucide="clock"></i>
+              <span>오늘 실시간</span>
+            </button>
+            <button class="action-btn" onclick="fetchAirData(currentStationCode, currentAirDate, true)" title="실시간 데이터 새로고침">
               <i data-lucide="refresh-cw"></i>
               <span>새로고침</span>
             </button>
@@ -307,38 +336,15 @@
             <table class="daegu-air-table" id="daegu-air-table">
               <thead>
                 <tr>
-                  <th rowspan="2">일시</th>
-                  <th colspan="3">통합대기환경지수</th>
-                  <th colspan="2">PM-2.5 (㎍/㎥)</th>
-                  <th colspan="2">PM-10 (㎍/㎥)</th>
-                  <th colspan="2">O3 (ppm)</th>
-                  <th colspan="2">CO (ppm)</th>
-                  <th colspan="2">SO2 (ppm)</th>
-                  <th colspan="2">NO2 (ppm)</th>
-                </tr>
-                <tr>
-                  <th>주원인</th>
-                  <th>상태</th>
-                  <th>지수</th>
-                  <th>상태</th>
-                  <th>농도</th>
-                  <th>상태</th>
-                  <th>농도</th>
-                  <th>상태</th>
-                  <th>지수</th>
-                  <th>상태</th>
-                  <th>지수</th>
-                  <th>상태</th>
-                  <th>지수</th>
-                  <th>상태</th>
-                  <th>지수</th>
+                  <th>자치구</th>
+                  <th>PM10 (㎍/㎥)</th>
+                  <th>등급</th>
                 </tr>
               </thead>
-              <tbody id="air-table-tbody">
-                <!-- 크롤링된 실시간 데이터가 여기에 행 단위로 주입됨 -->
+              <tbody id="district-summary-tbody">
                 <tr>
-                  <td colspan="16" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                    대구 실시간 대기정보를 불러오는 중입니다...
+                  <td colspan="3" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    지역 대기 정보를 불러오는 중입니다...
                   </td>
                 </tr>
               </tbody>
@@ -365,7 +371,7 @@
   </div>
 
   <!-- 지도 및 실시간 대기 스크립트 (캐시 무효화 및 직접/Live Server 실행 폴백 지원) -->
-  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_air_color_v1" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_air_color_v1';"></script>
+  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_uniform_alpha_v5" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_uniform_alpha_v5';"></script>
   <script>
     if (window.lucide) {
       lucide.createIcons();
