@@ -1,0 +1,421 @@
+{
+  "city": "대구광역시",
+  "center": [35.8714, 128.6014],
+  "summary": {
+    "total_vehicles": 8,
+    "total_roads_analyzed": 14,
+    "avg_route_improvement": "31.4%",
+    "avg_pm10_reduction": "41.8%",
+    "fuel_saving_monthly_liters": 2840,
+    "carbon_reduction_monthly_kg": 7384
+  },
+  "vehicles": [
+    {
+      "id": "DS-01",
+      "name": "대구분진 1호차 (중구/동성로 권역)",
+      "district": "중구",
+      "model": "16톤 도로분진흡입청소차",
+      "status": "운행대기",
+      "driver": "김대구",
+      "priority_score": 92,
+      "before_stats": {
+        "distance_km": 42.8,
+        "duration_min": 145,
+        "dust_collected_kg": 64.2,
+        "pm10_avg_after": 58
+      },
+      "after_stats": {
+        "distance_km": 29.5,
+        "duration_min": 98,
+        "dust_collected_kg": 88.6,
+        "pm10_avg_after": 32
+      },
+      "improvement": {
+        "distance_reduction_pct": 31.1,
+        "duration_reduction_pct": 32.4,
+        "dust_efficiency_gain_pct": 38.0,
+        "pm10_reduction_pct": 44.8
+      }
+    },
+    {
+      "id": "DS-02",
+      "name": "대구분진 2호차 (수성구/달구벌대로)",
+      "district": "수성구",
+      "model": "16톤 고압분진흡입차",
+      "status": "운행대기",
+      "driver": "이수성",
+      "priority_score": 95,
+      "before_stats": {
+        "distance_km": 48.6,
+        "duration_min": 160,
+        "dust_collected_kg": 72.1,
+        "pm10_avg_after": 64
+      },
+      "after_stats": {
+        "distance_km": 33.2,
+        "duration_min": 105,
+        "dust_collected_kg": 96.4,
+        "pm10_avg_after": 35
+      },
+      "improvement": {
+        "distance_reduction_pct": 31.7,
+        "duration_reduction_pct": 34.4,
+        "dust_efficiency_gain_pct": 33.7,
+        "pm10_reduction_pct": 45.3
+      }
+    },
+    {
+      "id": "DS-03",
+      "name": "대구분진 3호차 (동구/동대구역로)",
+      "district": "동구",
+      "model": "10톤 친환경분진차",
+      "status": "운행대기",
+      "driver": "박팔공",
+      "priority_score": 88,
+      "before_stats": {
+        "distance_km": 39.4,
+        "duration_min": 135,
+        "dust_collected_kg": 58.0,
+        "pm10_avg_after": 55
+      },
+      "after_stats": {
+        "distance_km": 27.6,
+        "duration_min": 92,
+        "dust_collected_kg": 79.2,
+        "pm10_avg_after": 30
+      },
+      "improvement": {
+        "distance_reduction_pct": 29.9,
+        "duration_reduction_pct": 31.9,
+        "dust_efficiency_gain_pct": 36.6,
+        "pm10_reduction_pct": 45.5
+      }
+    },
+    {
+      "id": "DS-04",
+      "name": "대구분진 4호차 (북구/신천대로·칠곡)",
+      "district": "북구",
+      "model": "16톤 도로분진흡입청소차",
+      "status": "운행대기",
+      "driver": "최침산",
+      "priority_score": 90,
+      "before_stats": {
+        "distance_km": 52.1,
+        "duration_min": 175,
+        "dust_collected_kg": 81.3,
+        "pm10_avg_after": 68
+      },
+      "after_stats": {
+        "distance_km": 35.8,
+        "duration_min": 115,
+        "dust_collected_kg": 108.5,
+        "pm10_avg_after": 38
+      },
+      "improvement": {
+        "distance_reduction_pct": 31.3,
+        "duration_reduction_pct": 34.3,
+        "dust_efficiency_gain_pct": 33.5,
+        "pm10_reduction_pct": 44.1
+      }
+    },
+    {
+      "id": "DS-05",
+      "name": "대구분진 5호차 (달서구/성서산단)",
+      "district": "달서구",
+      "model": "16톤 고압분진흡입차",
+      "status": "운행대기",
+      "driver": "정성서",
+      "priority_score": 96,
+      "before_stats": {
+        "distance_km": 56.4,
+        "duration_min": 190,
+        "dust_collected_kg": 94.0,
+        "pm10_avg_after": 76
+      },
+      "after_stats": {
+        "distance_km": 37.9,
+        "duration_min": 122,
+        "dust_collected_kg": 125.0,
+        "pm10_avg_after": 41
+      },
+      "improvement": {
+        "distance_reduction_pct": 32.8,
+        "duration_reduction_pct": 35.8,
+        "dust_efficiency_gain_pct": 33.0,
+        "pm10_reduction_pct": 46.1
+      }
+    },
+    {
+      "id": "DS-06",
+      "name": "대구분진 6호차 (서구/서대구역·비산)",
+      "district": "서구",
+      "model": "10톤 친환경분진차",
+      "status": "운행대기",
+      "driver": "강평리",
+      "priority_score": 87,
+      "before_stats": {
+        "distance_km": 38.5,
+        "duration_min": 130,
+        "dust_collected_kg": 56.2,
+        "pm10_avg_after": 59
+      },
+      "after_stats": {
+        "distance_km": 26.8,
+        "duration_min": 88,
+        "dust_collected_kg": 76.8,
+        "pm10_avg_after": 33
+      },
+      "improvement": {
+        "distance_reduction_pct": 30.4,
+        "duration_reduction_pct": 32.3,
+        "dust_efficiency_gain_pct": 36.7,
+        "pm10_reduction_pct": 44.1
+      }
+    },
+    {
+      "id": "DS-07",
+      "name": "대구분진 7호차 (남구/앞산순환로)",
+      "district": "남구",
+      "model": "10톤 친환경분진차",
+      "status": "운행대기",
+      "driver": "윤앞산",
+      "priority_score": 84,
+      "before_stats": {
+        "distance_km": 35.2,
+        "duration_min": 120,
+        "dust_collected_kg": 51.5,
+        "pm10_avg_after": 52
+      },
+      "after_stats": {
+        "distance_km": 24.5,
+        "duration_min": 80,
+        "dust_collected_kg": 69.3,
+        "pm10_avg_after": 29
+      },
+      "improvement": {
+        "distance_reduction_pct": 30.4,
+        "duration_reduction_pct": 33.3,
+        "dust_efficiency_gain_pct": 34.6,
+        "pm10_reduction_pct": 44.2
+      }
+    },
+    {
+      "id": "DS-08",
+      "name": "대구분진 8호차 (달성군/테크노폴리스)",
+      "district": "달성군",
+      "model": "16톤 도로분진흡입청소차",
+      "status": "운행대기",
+      "driver": "한비슬",
+      "priority_score": 82,
+      "before_stats": {
+        "distance_km": 46.0,
+        "duration_min": 150,
+        "dust_collected_kg": 68.4,
+        "pm10_avg_after": 54
+      },
+      "after_stats": {
+        "distance_km": 31.8,
+        "duration_min": 102,
+        "dust_collected_kg": 91.2,
+        "pm10_avg_after": 31
+      },
+      "improvement": {
+        "distance_reduction_pct": 30.9,
+        "duration_reduction_pct": 32.0,
+        "dust_efficiency_gain_pct": 33.3,
+        "pm10_reduction_pct": 42.6
+      }
+    }
+  ],
+  "routes": [
+    {
+      "id": "R01",
+      "name": "달구벌대로 (서구·달서구 ↔ 수성구 동서 횡단)",
+      "district": "수성구/달서구",
+      "length_km": 15.6,
+      "traffic_level": "매우높음",
+      "pm10_before": 88,
+      "pm10_after_clean": 36,
+      "points": [
+        [35.8562, 128.4907],
+        [35.8523, 128.5101],
+        [35.8533, 128.5292],
+        [35.8540, 128.5360],
+        [35.8548, 128.5447],
+        [35.8570, 128.5574],
+        [35.8601, 128.5670],
+        [35.8625, 128.5746],
+        [35.8647, 128.5833],
+        [35.8655, 128.5934],
+        [35.8617, 128.6067],
+        [35.8589, 128.6251],
+        [35.8558, 128.6433],
+        [35.8521, 128.6650]
+      ],
+      "before_route_points": [
+        [35.8562, 128.4907],
+        [35.8500, 128.5020],
+        [35.8523, 128.5101],
+        [35.8480, 128.5200],
+        [35.8533, 128.5292],
+        [35.8570, 128.5574],
+        [35.8650, 128.5700],
+        [35.8625, 128.5746],
+        [35.8655, 128.5934],
+        [35.8710, 128.6050],
+        [35.8617, 128.6067],
+        [35.8589, 128.6251],
+        [35.8558, 128.6433],
+        [35.8521, 128.6650]
+      ]
+    },
+    {
+      "id": "R02",
+      "name": "신천대로 (상동교 ↔ 침산교 ↔ 팔달교)",
+      "district": "남구/수성구/중구/북구",
+      "length_km": 12.8,
+      "traffic_level": "고속·과밀",
+      "pm10_before": 94,
+      "pm10_after_clean": 38,
+      "points": [
+        [35.8340, 128.6080],
+        [35.8450, 128.6085],
+        [35.8520, 128.6090],
+        [35.8575, 128.6095],
+        [35.8640, 128.6098],
+        [35.8705, 128.6102],
+        [35.8765, 128.6107],
+        [35.8820, 128.6060],
+        [35.8880, 128.5990],
+        [35.8940, 128.5870],
+        [35.8980, 128.5600]
+      ],
+      "before_route_points": [
+        [35.8340, 128.6080],
+        [35.8410, 128.6020],
+        [35.8450, 128.6085],
+        [35.8550, 128.6050],
+        [35.8640, 128.6098],
+        [35.8740, 128.6150],
+        [35.8765, 128.6107],
+        [35.8850, 128.6120],
+        [35.8880, 128.5990],
+        [35.8940, 128.5870],
+        [35.8980, 128.5600]
+      ]
+    },
+    {
+      "id": "R03",
+      "name": "동대구로 (범어네거리 ↔ 동대구역 ↔ 파티마)",
+      "district": "수성구/동구",
+      "length_km": 4.5,
+      "traffic_level": "높음",
+      "pm10_before": 82,
+      "pm10_after_clean": 31,
+      "points": [
+        [35.8589, 128.6251],
+        [35.8690, 128.6250],
+        [35.8778, 128.6285],
+        [35.8845, 128.6235]
+      ],
+      "before_route_points": [
+        [35.8589, 128.6251],
+        [35.8640, 128.6320],
+        [35.8690, 128.6250],
+        [35.8730, 128.6350],
+        [35.8778, 128.6285],
+        [35.8845, 128.6235]
+      ]
+    },
+    {
+      "id": "R04",
+      "name": "국채보상로 (평리네거리 ↔ 서문시장 ↔ 동인네거리)",
+      "district": "서구/중구",
+      "length_km": 6.8,
+      "traffic_level": "보통",
+      "pm10_before": 79,
+      "pm10_after_clean": 29,
+      "points": [
+        [35.8690, 128.5580],
+        [35.8700, 128.5700],
+        [35.8690, 128.5815],
+        [35.8700, 128.5960],
+        [35.8710, 128.6060],
+        [35.8780, 128.6180]
+      ],
+      "before_route_points": [
+        [35.8690, 128.5580],
+        [35.8740, 128.5630],
+        [35.8700, 128.5700],
+        [35.8690, 128.5815],
+        [35.8640, 128.5880],
+        [35.8700, 128.5960],
+        [35.8710, 128.6060],
+        [35.8780, 128.6180]
+      ]
+    },
+    {
+      "id": "R05",
+      "name": "앞산순환로 (상동교 ↔ 빨래터공원 ↔ 월곡로)",
+      "district": "남구/달서구",
+      "length_km": 8.5,
+      "traffic_level": "보통",
+      "pm10_before": 71,
+      "pm10_after_clean": 25,
+      "points": [
+        [35.8340, 128.6080],
+        [35.8310, 128.5970],
+        [35.8290, 128.5770],
+        [35.8295, 128.5700],
+        [35.8310, 128.5550],
+        [35.8270, 128.5380]
+      ],
+      "before_route_points": [
+        [35.8340, 128.6080],
+        [35.8360, 128.6010],
+        [35.8310, 128.5970],
+        [35.8290, 128.5770],
+        [35.8240, 128.5620],
+        [35.8310, 128.5550],
+        [35.8270, 128.5380]
+      ]
+    },
+    {
+      "id": "R06",
+      "name": "중앙대로 (대구역 ↔ 반월당 ↔ 영대병원)",
+      "district": "중구/남구",
+      "length_km": 5.4,
+      "traffic_level": "과밀·버스전용",
+      "pm10_before": 86,
+      "pm10_after_clean": 33,
+      "points": [
+        [35.8770, 128.5960],
+        [35.8714, 128.5940],
+        [35.8655, 128.5934],
+        [35.8570, 128.5900],
+        [35.8475, 128.5870],
+        [35.8420, 128.5780]
+      ],
+      "before_route_points": [
+        [35.8770, 128.5960],
+        [35.8750, 128.5890],
+        [35.8714, 128.5940],
+        [35.8655, 128.5934],
+        [35.8610, 128.5980],
+        [35.8570, 128.5900],
+        [35.8475, 128.5870],
+        [35.8420, 128.5780]
+      ]
+    }
+  ],
+  "monitoring_stations": [
+    {"name": "수창동(중구)", "lat": 35.8741, "lng": 128.5852, "pm10": 67, "district": "중구"},
+    {"name": "만촌동(수성구)", "lat": 35.8542, "lng": 128.6473, "pm10": 74, "district": "수성구"},
+    {"name": "신암동(동구)", "lat": 35.8821, "lng": 128.6214, "pm10": 79, "district": "동구"},
+    {"name": "노원동(북구)", "lat": 35.8923, "lng": 128.5789, "pm10": 85, "district": "북구"},
+    {"name": "이현동(서구)", "lat": 35.8755, "lng": 128.5361, "pm10": 91, "district": "서구"},
+    {"name": "대명동(남구)", "lat": 35.8415, "lng": 128.5804, "pm10": 63, "district": "남구"},
+    {"name": "호산동(달서구)", "lat": 35.8488, "lng": 128.4891, "pm10": 88, "district": "달서구"},
+    {"name": "다사읍(달성군)", "lat": 35.8579, "lng": 128.4552, "pm10": 58, "district": "달성군"}
+  ]
+}
