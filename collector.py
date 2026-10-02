@@ -64,43 +64,85 @@ def _cleanup_old_cache(keep_days: int = 2):
     except Exception as e:
         print(f"[AirCache] 캐시 정리 실패: {e}")
 
-# 자치구별 대표 대기측정소 매핑
-DISTRICT_STATION_MAP = {
-    '중구': {'sttn_cd': '701', 'name': '수창동'},
-    '남구': {'sttn_cd': '702', 'name': '대명동'},
-    '수성구': {'sttn_cd': '703', 'name': '만촌동'},
-    '동구': {'sttn_cd': '704', 'name': '신암동'},
-    '북구': {'sttn_cd': '705', 'name': '노원동'},
-    '서구': {'sttn_cd': '709', 'name': '이현동'},
-    '달서구': {'sttn_cd': '710', 'name': '호산동'},
-    '달성군': {'sttn_cd': '714', 'name': '다사읍'}
-}
-
-# 대구 주요 측정소 전체 이름 사전
+# 대구광역시 보건환경연구원 공식 26개 측정소 사전 (sttn_cd -> 한글명 및 소속 구·군)
 STATION_NAMES = {
     '701': '수창동(중구)',
-    '702': '대명동(남구)',
-    '703': '만촌동(수성구)',
-    '704': '신암동(동구)',
-    '705': '노원동(북구)',
-    '707': '지산동(수성구)',
+    '702': '지산동(수성구)',
+    '703': '서호동(동구)',
+    '704': '이현동(서구)',
+    '705': '대명동(남구)',
+    '707': '신암동(동구)',
     '708': '태전동(북구)',
-    '709': '이현동(서구)',
-    '710': '호산동(달서구)',
-    '711': '현풍읍(달성군)',
+    '709': '만촌동(수성구)',
+    '710': '호림동(달서구)',
+    '711': '유가읍(달성군)',
     '712': '시지동(수성구)',
-    '713': '율하동(동구)',
+    '713': '진천동(달서구)',
     '714': '다사읍(달성군)',
-    '715': '서호동(동구)',
-    '716': '본동(달서구)',
+    '715': '본동(달서구)',
+    '716': '산격동(북구)',
     '717': '화원읍(달성군)',
-    '718': '진천동(달서구)',
+    '718': '내당동(서구)',
     '719': '침산동(북구)',
-    '720': '대명11동(남구)',
-    '721': '봉무동(동구)',
+    '720': '남산1동(중구)',
+    '721': '군위읍(군위군)',
     '802': '평리동(서구)',
-    '803': '이곡동(달서구)'
+    '803': '이곡동(달서구)',
+    '804': '충혼탑(남구)',
+    '805': '서변동(북구)',
+    '806': '연호동(수성구)',
+    '807': '용계동(동구)'
 }
+
+# 측정소 이름 -> 코드 역매핑 (테이블 헤더 파싱용)
+STATION_NAME_TO_CODE = {
+    '수창동': '701', '지산동': '702', '서호동': '703', '이현동': '704',
+    '대명동': '705', '신암동': '707', '태전동': '708', '만촌동': '709',
+    '호림동': '710', '유가읍': '711', '시지동': '712', '진천동': '713',
+    '다사읍': '714', '본동': '715',   '산격동': '716', '화원읍': '717',
+    '내당동': '718', '침산동': '719', '남산1동': '720', '군위읍': '721',
+    '평리동': '802', '이곡동': '803', '충혼탑': '804', '서변동': '805',
+    '연호동': '806', '용계동': '807'
+}
+
+# 26개 측정소별 소속 구·군 매핑
+STATION_DISTRICT_MAP = {
+    '701': '중구',   '702': '수성구', '703': '동구',   '704': '서구',
+    '705': '남구',   '707': '동구',   '708': '북구',   '709': '수성구',
+    '710': '달서구', '711': '달성군', '712': '수성구', '713': '달서구',
+    '714': '달성군', '715': '달서구', '716': '북구',   '717': '달성군',
+    '718': '서구',   '719': '북구',   '720': '중구',   '721': '군위군',
+    '802': '서구',   '803': '달서구', '804': '남구',   '805': '북구',
+    '806': '수성구', '807': '동구'
+}
+
+# 8개 자치구별 대표 대기측정소 매핑 (점검 중일 경우 순차 fallback 지원)
+DISTRICT_STATION_MAP = {
+    '중구':   {'sttn_cd': '701', 'name': '수창동', 'fallbacks': ['720']},
+    '남구':   {'sttn_cd': '705', 'name': '대명동', 'fallbacks': ['804']},
+    '동구':   {'sttn_cd': '707', 'name': '신암동', 'fallbacks': ['703', '807']},
+    '서구':   {'sttn_cd': '704', 'name': '이현동', 'fallbacks': ['718', '802']},
+    '북구':   {'sttn_cd': '708', 'name': '태전동', 'fallbacks': ['716', '719', '805']},
+    '수성구': {'sttn_cd': '709', 'name': '만촌동', 'fallbacks': ['702', '712', '806']},
+    '달서구': {'sttn_cd': '803', 'name': '이곡동', 'fallbacks': ['710', '713', '715']},
+    '달성군': {'sttn_cd': '714', 'name': '다사읍', 'fallbacks': ['711', '717']}
+}
+
+# 26개 측정소별 상세 위치(GPS 좌표, 주소, 측정망 유형, 설치년도) 로드
+_STATIONS_JSON_PATH = os.path.join(os.path.dirname(__file__), 'data', 'daegu_air_stations.json')
+STATIONS_LOCATION_MAP = {}
+if os.path.exists(_STATIONS_JSON_PATH):
+    try:
+        with open(_STATIONS_JSON_PATH, 'r', encoding='utf-8') as f:
+            _st_list = json.load(f)
+            for _s in _st_list:
+                STATIONS_LOCATION_MAP[_s['sttn_cd']] = _s
+    except Exception as e:
+        print(f"[AirCollector] 측정소 위치 데이터 로드 실패: {e}")
+
+def get_all_stations_locations():
+    """26개 전체 측정소의 위치 및 메타데이터 목록 반환"""
+    return list(STATIONS_LOCATION_MAP.values())
 
 def load_daegu_data():
     """대구 분진흡입차량 운행 경로 및 환경 데이터셋 로드"""
@@ -165,8 +207,9 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
     except Exception as e:
         print(f"[AirCrawler] 크롤링 오류 ({url}): {e}")
         # 오류 시 캐시가 있으면 캐시 반환, 없으면 빈 구조
-        if cache_key in _AIR_CACHE:
-            return _AIR_CACHE[cache_key]
+        cached_err = _load_cache(cache_key)
+        if cached_err:
+            return cached_err
         return {
             'sttn_cd': sttn_cd,
             'station_name': STATION_NAMES.get(sttn_cd, '대구측정소'),
@@ -274,42 +317,44 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
     _cleanup_old_cache(keep_days=2)
     return result
 
-# locationRealTimeView URL에서 sttn_cd 순서 (헤더 컬럼 순서와 1:1 매핑)
-_MULTI_STTN_ORDER = [
-    '701','702','703','704','705','707','708','709',
-    '710','711','712','713','714','715','716','717',
-    '718','719','720','721','802','803','804','805','806','807'
-]
-
-def crawl_all_stations_pm10(date_str=None):
+def crawl_all_stations_pm10(date_str=None, hour_str=None):
     """
-    locationRealTimeView 단일 URL로 전체 측정소 PM10 데이터 한번에 크롤링.
-    반환: {sttn_cd: {'pm10': int, 'level': int, 'text': str, 'color': str}}
+    locationRealTimeView 단일 URL로 전체 측정소 PM10 & PM2.5 데이터 한번에 크롤링.
+    - hour_str 지정 시 (예: '14' 또는 '14:00'): 해당 시간대 데이터 정밀 추출
+    - hour_str 미지정/all: 오늘이면 최신 시간(HOUR), 과거면 일평균(DAY)
     """
     today_str = datetime.now().strftime('%Y-%m-%d')
     is_today = (not date_str) or (date_str == today_str)
     if not date_str:
         date_str = today_str
 
-    # 캐시 키
-    if is_today:
+    hour_clean = None
+    if hour_str and hour_str != 'all':
+        hour_clean = hour_str.split(':')[0].zfill(2)
+
+    if hour_clean:
+        period_type = 'HOUR'
+        cache_key = f"all_stations_{date_str}_h{hour_clean}"
+    elif is_today:
         now_hour = datetime.now().strftime('%H')
         cache_key = f"all_stations_{date_str}_{now_hour}"
+        period_type = 'HOUR'
     else:
-        cache_key = f"all_stations_{date_str}_all"
+        cache_key = f"all_stations_{date_str}_day"
+        period_type = 'DAY'
 
     cached = _load_cache(cache_key)
     if cached:
         print(f"[AirCache] 전체측정소 캐시 HIT: {cache_key}")
         return cached
 
-    sttn_params = '&'.join(f'sttn_cd={cd}' for cd in _MULTI_STTN_ORDER)
+    sttn_params = '&'.join(f'sttn_cd={cd}' for cd in STATION_NAME_TO_CODE.values())
     url = (
-        f"https://air.daegu.go.kr/index.do?period_type=HOUR"
+        f"https://air.daegu.go.kr/index.do?period_type={period_type}"
         f"&menu_id=00000741"
         f"&menu_link=%2Ffront%2FrealTime%2FlocationRealTimeView.do"
         f"&ntw=1%2C2&{sttn_params}"
-        f"&from={date_str}&fromtime=00&to={date_str}&totime=23&itm=8"
+        f"&from={date_str}&fromtime=00&to={date_str}&totime=23&itm=7&itm=8"
     )
 
     ctx = ssl.create_default_context()
@@ -330,27 +375,51 @@ def crawl_all_stations_pm10(date_str=None):
     if len(tables) < 2:
         return {}
 
-    # table[1]: 등급+값 포함 버전
     t = tables[1]
     rows = t.find_all('tr')
-    if len(rows) < 2:
+    if len(rows) < 3:
         return {}
 
-    # 데이터 row 중 값이 있는 마지막 row 찾기
-    latest_vals = None
-    for row in reversed(rows[1:]):
-        tds = [c.get_text(strip=True) for c in row.find_all('td')]
-        # 값 컬럼: col 1 = 등급, col 2 = 값 (colspan=2 구조)
-        # tds 구조: [시간, 등급1, 값1, 등급2, 값2, ...]
-        vals = tds[2::2]  # 값만 추출 (인덱스 2, 4, 6, ...)
-        if any(v not in ('', '-') for v in vals):
-            latest_vals = (tds[0], vals)  # (시간, [값...])
-            break
-
-    if not latest_vals:
+    # 1. 첫 번째 행(헤더)에서 측정소 이름 목록 추출 (0번 '일자' 제외)
+    th_stations = [th.get_text(strip=True) for th in rows[0].find_all(['th', 'td'])][1:]
+    if not th_stations:
         return {}
 
-    time_str, pm10_values = latest_vals
+    # 2. 데이터 행 찾기
+    latest_row = None
+    if hour_clean:
+        # 특정 시간(예: '14:00') 검색
+        target_suffix = f"{hour_clean}:00"
+        for r in rows[2:]:
+            tds = [td.get_text(strip=True) for td in r.find_all(['th', 'td'])]
+            if len(tds) > 1 and tds[0].endswith(target_suffix):
+                latest_row = tds
+                break
+        # 매칭 행이 없으면 최신 유효 행으로 fallback
+        if not latest_row:
+            for r in reversed(rows[2:]):
+                tds = [td.get_text(strip=True) for td in r.find_all(['th', 'td'])]
+                if len(tds) > 1 and any(v not in ('', '-', '점검중') for v in tds[1:]):
+                    latest_row = tds
+                    break
+    elif period_type == 'DAY':
+        for r in rows[2:]:
+            tds = [td.get_text(strip=True) for td in r.find_all(['th', 'td'])]
+            if len(tds) > 1 and any(v not in ('', '-', '점검중') for v in tds[1:]):
+                latest_row = tds
+                break
+    else:
+        for r in reversed(rows[2:]):
+            tds = [td.get_text(strip=True) for td in r.find_all(['th', 'td'])]
+            if len(tds) > 1 and any(v not in ('', '-', '점검중') for v in tds[1:]):
+                latest_row = tds
+                break
+
+    if not latest_row:
+        return {}
+
+    time_str = latest_row[0]
+    raw_cells = latest_row[1:]
 
     def _pm10_grade(val):
         if val <= 30:   return {'level': 1, 'text': '좋음',    'color': '#3b82f6'}
@@ -358,71 +427,113 @@ def crawl_all_stations_pm10(date_str=None):
         elif val <= 150:return {'level': 3, 'text': '나쁨',    'color': '#f59e0b'}
         else:           return {'level': 4, 'text': '매우나쁨', 'color': '#ef4444'}
 
+    def _pm25_grade(val):
+        if val <= 15:   return {'level': 1, 'text': '좋음',    'color': '#3b82f6'}
+        elif val <= 35: return {'level': 2, 'text': '보통',    'color': '#10b981'}
+        elif val <= 75: return {'level': 3, 'text': '나쁨',    'color': '#f59e0b'}
+        else:           return {'level': 4, 'text': '매우나쁨', 'color': '#ef4444'}
+
     result = {}
-    for i, sttn_cd in enumerate(_MULTI_STTN_ORDER):
-        if i >= len(pm10_values):
-            break
-        raw = pm10_values[i]
-        try:
-            val = int(raw)
-        except (ValueError, TypeError):
+    for i, st_name in enumerate(th_stations):
+        sttn_cd = STATION_NAME_TO_CODE.get(st_name)
+        if not sttn_cd:
             continue
-        grade = _pm10_grade(val)
+        c_idx = i * 4
+        if c_idx + 3 >= len(raw_cells):
+            continue
+
+        raw_pm10 = raw_cells[c_idx + 1]
+        raw_pm25 = raw_cells[c_idx + 3]
+
+        try:
+            val10 = int(raw_pm10)
+        except (ValueError, TypeError):
+            val10 = None
+
+        try:
+            val25 = int(raw_pm25)
+        except (ValueError, TypeError):
+            val25 = None
+
+        g10 = _pm10_grade(val10) if val10 is not None else {'level': 2, 'text': '보통', 'color': '#10b981'}
+        g25 = _pm25_grade(val25) if val25 is not None else {'level': 2, 'text': '보통', 'color': '#10b981'}
+
+        # 미세먼지(PM10)와 초미세먼지(PM2.5) 중 더 높은(심각한) 등급을 종합 등급으로 채택 (환경부 CAI 기준)
+        overall_grade = g25 if g25['level'] > g10['level'] else g10
+
+        loc_info = STATIONS_LOCATION_MAP.get(sttn_cd, {})
         result[sttn_cd] = {
             'sttn_cd': sttn_cd,
-            'station_name': STATION_NAMES.get(sttn_cd, sttn_cd),
-            'pm10': val,
-            'time': time_str,
-            **grade
+            'station_name': st_name,
+            'district': STATION_DISTRICT_MAP.get(sttn_cd, ''),
+            'address': loc_info.get('address', ''),
+            'network': loc_info.get('network', '도시대기'),
+            'year': loc_info.get('year', ''),
+            'lat': loc_info.get('lat'),
+            'lng': loc_info.get('lng'),
+            'pm10': val10 if val10 is not None else '-',
+            'pm10_level': g10['level'],
+            'pm10_text': g10['text'],
+            'pm10_color': g10['color'],
+            'pm25': val25 if val25 is not None else '-',
+            'pm25_level': g25['level'],
+            'pm25_text': g25['text'],
+            'pm25_color': g25['color'],
+            # 초미세먼지 등급을 함께 고려한 종합 대기등급
+            'level': overall_grade['level'],
+            'text': overall_grade['text'],
+            'color': overall_grade['color'],
+            'time': time_str
         }
 
-    print(f"[AirCrawler] 전체측정소 PM10 크롤링 완료: {len(result)}개 ({time_str})")
+    print(f"[AirCrawler] 전체측정소 크롤링 완료: {len(result)}개 ({time_str}, {period_type})")
     _save_cache(cache_key, result)
     _cleanup_old_cache(keep_days=2)
     return result
 
 
-def get_all_districts_air_summary(date_str=None):
+def get_all_districts_air_summary(date_str=None, hour_str=None):
     """
-    8개 자치구 대표 측정소 PM10 등급 종합 반환.
-    단일 URL로 전체 측정소 한번에 크롤링 (기존 8회 → 1회).
-    실패 시 개별 크롤링으로 fallback.
+    8개 자치구 대표 측정소 PM10 & PM2.5 등급 종합 반환.
+    대표 측정소가 점검 중('-')인 경우 같은 자치구의 예비(fallback) 측정소 값 자동 채택.
     """
     data = load_daegu_data()
     stations_data = {s['district']: s['pm10'] for s in data.get('monitoring_stations', [])}
 
-    # 단일 URL 전체측정소 크롤링 (1회 요청)
-    all_pm10 = crawl_all_stations_pm10(date_str=date_str)
+    all_stations = crawl_all_stations_pm10(date_str=date_str, hour_str=hour_str)
 
     results = {}
     for dist, sttn_info in DISTRICT_STATION_MAP.items():
-        sttn_cd = sttn_info['sttn_cd']
-        sttn_name = sttn_info['name']
         base_pm10 = stations_data.get(dist, 65)
+        primary_cd = sttn_info['sttn_cd']
+        candidates = [primary_cd] + sttn_info.get('fallbacks', [])
 
-        station_data = all_pm10.get(sttn_cd)
-        if station_data:
-            val = station_data['pm10']
+        chosen_data = None
+        for cd in candidates:
+            cand = all_stations.get(cd)
+            if cand and cand['pm10'] not in ('-', None, ''):
+                chosen_data = cand
+                break
+
+        if not chosen_data:
+            chosen_data = all_stations.get(primary_cd)
+
+        if chosen_data and chosen_data['pm10'] not in ('-', None, ''):
             results[dist] = {
                 'district': dist,
-                'sttn_cd': sttn_cd,
-                'sttn_name': sttn_name,
-                'pm10': val,
-                'level': station_data['level'],
-                'text': station_data['text'],
-                'color': station_data['color']
+                'sttn_cd': chosen_data['sttn_cd'],
+                'sttn_name': chosen_data['station_name'],
+                'pm10': chosen_data['pm10'],
+                'pm25': chosen_data['pm25'],
+                'level': chosen_data['level'],
+                'text': chosen_data['text'],
+                'color': chosen_data['color'],
+                'pm10_text': chosen_data['pm10_text'],
+                'pm25_text': chosen_data['pm25_text'],
+                'time': chosen_data.get('time', '')
             }
         else:
-            # fallback: 개별 크롤링
-            try:
-                realtime = crawl_daegu_realtime_air(sttn_cd=sttn_cd, date_str=date_str)
-                latest = realtime.get('latest')
-                raw_val = latest['pm10']['value'] if latest and latest.get('pm10') else None
-                val = int(raw_val) if raw_val and raw_val not in ('-', '') else base_pm10
-            except Exception as e:
-                print(f"[AirSummary] {dist}({sttn_cd}) fallback 실패 → 기본값: {e}")
-                val = base_pm10
-
+            val = base_pm10
             def _grade(v):
                 if v <= 30:   return 1, '좋음',    '#3b82f6'
                 elif v <= 80: return 2, '보통',    '#10b981'
@@ -432,13 +543,18 @@ def get_all_districts_air_summary(date_str=None):
 
             results[dist] = {
                 'district': dist,
-                'sttn_cd': sttn_cd,
-                'sttn_name': sttn_name,
+                'sttn_cd': primary_cd,
+                'sttn_name': sttn_info['name'],
                 'pm10': val,
+                'pm25': int(val * 0.7),
                 'level': level,
                 'text': text,
-                'color': color
+                'color': color,
+                'pm10_text': text,
+                'pm25_text': text,
+                'time': ''
             }
 
     return results
+
 

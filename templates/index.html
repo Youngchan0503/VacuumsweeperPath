@@ -137,21 +137,21 @@
             대기 측정소 직접 선택
           </label>
           <select id="station-select" class="custom-select">
-            <option value="701">수창동 (중구)</option>
-            <option value="702">대명동 (남구)</option>
-            <option value="703">만촌동 (수성구)</option>
-            <option value="704">신암동 (동구)</option>
-            <option value="705">노원동 (북구)</option>
-            <option value="707">지산동 (수성구)</option>
-            <option value="708">태전동 (북구)</option>
-            <option value="709">이현동 (서구)</option>
-            <option value="710">호산동 (달서구)</option>
-            <option value="711">현풍읍 (달성군)</option>
-            <option value="714">다사읍 (달성군)</option>
-            <option value="717">화원읍 (달성군)</option>
-            <option value="719">침산동 (북구)</option>
-            <option value="802">평리동 (서구)</option>
-            <option value="803">이곡동 (달서구)</option>
+            <option value="701">701 수창동 (중구)</option>
+            <option value="705">705 대명동 (남구)</option>
+            <option value="707">707 신암동 (동구)</option>
+            <option value="704">704 이현동 (서구)</option>
+            <option value="708">708 태전동 (북구)</option>
+            <option value="709">709 만촌동 (수성구)</option>
+            <option value="803">803 이곡동 (달서구)</option>
+            <option value="710">710 호림동 (달서구)</option>
+            <option value="714">714 다사읍 (달성군)</option>
+            <option value="702">702 지산동 (수성구)</option>
+            <option value="703">703 서호동 (동구)</option>
+            <option value="711">711 유가읍 (달성군)</option>
+            <option value="717">717 화원읍 (달성군)</option>
+            <option value="719">719 침산동 (북구)</option>
+            <option value="802">802 평리동 (서구)</option>
           </select>
         </div>
 
@@ -233,6 +233,14 @@
             <span class="legend-box-line" style="background: #a855f7; box-shadow: 0 0 8px rgba(168, 85, 247, 0.85);"></span>
             <span style="color: #f1f5f9; font-weight: 600;">분진차량 운행 도로망</span>
           </div>
+          <div class="legend-item">
+            <span class="legend-pin-icon" style="background: #0ea5e9; border: 2px solid #ffffff; width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(14, 165, 233, 0.8);"></span>
+            <span>도시대기측정소 (20개소)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-pin-icon" style="background: #e11d48; border: 2px solid #ffffff; width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(225, 29, 72, 0.8);"></span>
+            <span>도로변대기측정소 (6개소)</span>
+          </div>
         </div>
       </div>
     </aside>
@@ -269,7 +277,7 @@
           <span>위성사진</span>
         </button>
       </div>
-      <!-- 2. 오버레이 레이어 토글: [행정구역] [도로망 노선] -->
+      <!-- 2. 오버레이 레이어 토글: [행정구역] [도로망 노선] [측정소 핀] -->
       <div class="nft-layer-wrap">
         <button class="nft-layer-item active" id="nft-layer-dist" onclick="toggleNaverOverlay('district')" title="대구 자치구 & 142개 읍·면·동 행정구역 경계 표시 (On/Off)">
           <span class="nft-dot"></span>
@@ -280,6 +288,11 @@
           <span class="nft-dot"></span>
           <i data-lucide="truck" class="nft-layer-icon"></i>
           <span>도로망 노선</span>
+        </button>
+        <button class="nft-layer-item active" id="nft-layer-station" onclick="toggleNaverOverlay('stations')" title="대구 26개 실시간 대기 측정소 핀 위치 표시 (On/Off)">
+          <span class="nft-dot"></span>
+          <i data-lucide="map-pin" class="nft-layer-icon"></i>
+          <span>측정소</span>
         </button>
       </div>
     </div>
@@ -304,41 +317,53 @@
           </div>
 
           <div class="amh-controls">
-            <div class="modal-sttn-select">
-              <label for="modal-date-input"><i data-lucide="calendar" style="width:13px; height:13px; vertical-align:middle;"></i> 조회일자:</label>
-              <input type="date" id="modal-date-input" class="custom-select" style="width: auto; padding: 4px 8px; font-size: 0.76rem; cursor: pointer;" title="조회 날짜 선택 (변경 시 해당 날짜 데이터 실시간 크롤링)">
+            <div class="modal-control-group">
+              <label for="modal-date-input"><i data-lucide="calendar" style="width:12px; height:12px;"></i> 조회일자</label>
+              <input type="date" id="modal-date-input" class="custom-select" style="width: 135px; cursor: pointer;" title="조회 날짜 선택">
             </div>
-            <div class="modal-sttn-select">
-              <label for="modal-station-select">측정소:</label>
-              <select id="modal-station-select" class="custom-select" style="width: auto;">
-                <option value="701">701 수창동(중구)</option>
-                <option value="702">702 대명동(남구)</option>
-                <option value="703">703 만촌동(수성구)</option>
-                <option value="704">704 신암동(동구)</option>
-                <option value="705">705 노원동(북구)</option>
-                <option value="707">707 지산동(수성구)</option>
-                <option value="708">708 태전동(북구)</option>
-                <option value="709">709 이현동(서구)</option>
-                <option value="710">710 호산동(달서구)</option>
-                <option value="711">711 현풍읍(달성군)</option>
-                <option value="714">714 다사읍(달성군)</option>
-                <option value="717">717 화원읍(달성군)</option>
-                <option value="719">719 침산동(북구)</option>
-                <option value="802">802 평리동(서구)</option>
-                <option value="803">803 이곡동(달서구)</option>
+            <div class="modal-control-group">
+              <label for="modal-hour-select"><i data-lucide="clock" style="width:12px; height:12px;"></i> 조회시간</label>
+              <select id="modal-hour-select" class="custom-select" style="width: 145px; cursor: pointer;">
+                <option value="all">전체 (일평균/최신)</option>
+                <option value="01">01:00</option>
+                <option value="02">02:00</option>
+                <option value="03">03:00</option>
+                <option value="04">04:00</option>
+                <option value="05">05:00</option>
+                <option value="06">06:00</option>
+                <option value="07">07:00</option>
+                <option value="08">08:00</option>
+                <option value="09">09:00</option>
+                <option value="10">10:00</option>
+                <option value="11">11:00</option>
+                <option value="12">12:00</option>
+                <option value="13">13:00</option>
+                <option value="14">14:00</option>
+                <option value="15">15:00</option>
+                <option value="16">16:00</option>
+                <option value="17">17:00</option>
+                <option value="18">18:00</option>
+                <option value="19">19:00</option>
+                <option value="20">20:00</option>
+                <option value="21">21:00</option>
+                <option value="22">22:00</option>
+                <option value="23">23:00</option>
+                <option value="24">24:00</option>
               </select>
             </div>
-            <button class="action-btn" id="btn-air-today" onclick="fetchAirData(currentStationCode, null, true)" title="오늘 최신 실시간 데이터로 복귀">
-              <i data-lucide="clock"></i>
-              <span>오늘 실시간</span>
-            </button>
-            <button class="action-btn" onclick="fetchAirData(currentStationCode, currentAirDate, true)" title="실시간 데이터 새로고침">
-              <i data-lucide="refresh-cw"></i>
-              <span>새로고침</span>
-            </button>
-            <button class="modal-close-btn" onclick="closeAirModal()">
-              <i data-lucide="x"></i>
-            </button>
+            <div class="amh-buttons">
+              <button class="action-btn" id="btn-air-today" onclick="refreshAirModal(null, 'all', true)" title="오늘 최신 실시간 데이터로 복귀" style="height: 32px;">
+                <i data-lucide="clock"></i>
+                <span>오늘 실시간</span>
+              </button>
+              <button class="action-btn" id="btn-modal-refresh" onclick="refreshAirModal(document.getElementById('modal-date-input')?.value || currentAirDate, document.getElementById('modal-hour-select')?.value || currentAirHour, true)" title="실시간 데이터 새로고침" style="height: 32px;">
+                <i data-lucide="refresh-cw"></i>
+                <span>새로고침</span>
+              </button>
+              <button class="modal-close-btn" onclick="closeAirModal()" style="height: 32px; width: 32px;">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -348,15 +373,17 @@
             <table class="daegu-air-table" id="daegu-air-table">
               <thead>
                 <tr>
+                  <th>측정소</th>
                   <th>자치구</th>
                   <th>PM10 (㎍/㎥)</th>
-                  <th>등급</th>
+                  <th>PM2.5 (㎍/㎥)</th>
+                  <th>대기등급</th>
                 </tr>
               </thead>
               <tbody id="district-summary-tbody">
                 <tr>
-                  <td colspan="3" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                    지역 대기 정보를 불러오는 중입니다...
+                  <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    대구 26개 측정소 대기 정보를 불러오는 중입니다...
                   </td>
                 </tr>
               </tbody>
@@ -365,12 +392,13 @@
         </div>
 
         <!-- 모달 푸터: 범례 가이드 -->
+        <!-- 모달 푸터: 범례 가이드 (환경부 통합대기환경지수 기준) -->
         <div class="air-modal-footer">
           <div class="grade-legend-row">
-            <span class="legend-item"><span class="status-dot status-good"></span> 좋음 (0~30)</span>
-            <span class="legend-item"><span class="status-dot status-moderate"></span> 보통 (31~80)</span>
-            <span class="legend-item"><span class="status-dot status-bad"></span> 나쁨 (81~150)</span>
-            <span class="legend-item"><span class="status-dot status-very-bad"></span> 매우나쁨 (151~)</span>
+            <span class="legend-item"><span class="status-dot status-good"></span> 좋음 (PM10 ≤30 / PM2.5 ≤15)</span>
+            <span class="legend-item"><span class="status-dot status-moderate"></span> 보통 (31~80 / 16~35)</span>
+            <span class="legend-item"><span class="status-dot status-bad"></span> 나쁨 (81~150 / 36~75)</span>
+            <span class="legend-item"><span class="status-dot status-very-bad"></span> 매우나쁨 (151~ / 76~)</span>
           </div>
           <a href="https://air.daegu.go.kr/index.do?menu_id=00000801&menu_link=%2Ffront%2FrealTimeAir%2FrealTimeTotalAirView.do&sttn_cd=701&from=2026-10-01&fromtime=00&to=2026-10-01&totime=23" target="_blank" class="official-link">
             <span>공식 사이트 원문 바로가기</span>
@@ -383,7 +411,7 @@
   </div>
 
   <!-- 지도 및 실시간 대기 스크립트 (캐시 무효화 및 직접/Live Server 실행 폴백 지원) -->
-  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_uniform_alpha_v5" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_uniform_alpha_v5';"></script>
+  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_uniform_alpha_v12" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_uniform_alpha_v12';"></script>
   <script>
     if (window.lucide) {
       lucide.createIcons();

@@ -16,6 +16,7 @@ let currentStationCode = '701'; // 기본: 수창동(중구)
 // 네이버 지도 스타일 오버레이 토글 상태
 let isDistrictOverlayOn = true;
 let isRoutesOverlayOn = true;
+let isStationsOverlayOn = true;
 
 // Leaflet 레이어 참조
 let leafletMapInstance = null;
@@ -24,9 +25,11 @@ let esriSatelliteTileLayer = null;
 let leafletDongLayer = null;
 let selectedDongHighlightLayer = null; // 선택된 동 전용 최상단 네온 SVG 하이라이트 레이어
 let leafletRouteLayerGroup = null;
+let leafletStationLayerGroup = null; // 대기 측정소 핀 마커 레이어 그룹
 let leafletRoutePolylines = [];
 let daeguDongGeoJsonData = null;
 let currentlyHoveredDongLayer = null;
+let allStationsList = [];
 
 // 마우스 드래그 & 클릭 판별 제어 상태 변수
 let isMapMouseDown = false;
@@ -79,12 +82,12 @@ const districtNameToId = {
 // 자치구별 대표 대기측정소 매핑
 const districtToStation = {
   '중구': '701',    // 수창동
-  '남구': '702',    // 대명동
-  '수성구': '703',  // 만촌동
-  '동구': '704',    // 신암동
-  '북구': '705',    // 노원동
-  '서구': '709',    // 이현동
-  '달서구': '710',  // 호산동
+  '남구': '705',    // 대명동
+  '수성구': '709',  // 만촌동
+  '동구': '707',    // 신암동
+  '북구': '708',    // 태전동
+  '서구': '704',    // 이현동
+  '달서구': '803',  // 이곡동
   '달성군': '714'   // 다사읍
 };
 
@@ -112,59 +115,229 @@ const defaultDistrictAirData = {
 
 let currentDistrictAirData = { ...defaultDistrictAirData };
 
-// PM10 수치 기반 4단계 대기질 등급(좋음/보통/나쁨/매우나쁨) 및 색상 판정
-function getAirGradeFromPm10(pm10) {
-  const val = Number(pm10) || 0;
-  if (val <= 30) {
-    return { level: 1, text: '좋음', color: '#3b82f6', bgClass: 'bg-air-good' };
-  } else if (val <= 80) {
-    return { level: 2, text: '보통', color: '#10b981', bgClass: 'bg-air-moderate' };
-  } else if (val <= 150) {
-    return { level: 3, text: '나쁨', color: '#f59e0b', bgClass: 'bg-air-bad' };
-  } else {
-    return { level: 4, text: '매우나쁨', color: '#ef4444', bgClass: 'bg-air-very-bad' };
+// PM10 및 PM2.5 수치 기반 4단계 통합 대기질 등급 (환경부 CAI 방식: 둘 중 더 나쁜 등급 적용)
+function getAirGrade(pm10, pm25 = null) {
+  let g10 = null;
+  if (pm10 !== null && pm10 !== undefined && pm10 !== '' && pm10 !== '-') {
+    const v10 = Number(pm10);
+    if (!isNaN(v10)) {
+      if (v10 <= 30) g10 = { level: 1, text: '좋음', color: '#3b82f6', bgClass: 'bg-air-good' };
+      else if (v10 <= 80) g10 = { level: 2, text: '보통', color: '#10b981', bgClass: 'bg-air-moderate' };
+      else if (v10 <= 150) g10 = { level: 3, text: '나쁨', color: '#f59e0b', bgClass: 'bg-air-bad' };
+      else g10 = { level: 4, text: '매우나쁨', color: '#ef4444', bgClass: 'bg-air-very-bad' };
+    }
   }
+
+  let g25 = null;
+  if (pm25 !== null && pm25 !== undefined && pm25 !== '' && pm25 !== '-') {
+    const v25 = Number(pm25);
+    if (!isNaN(v25)) {
+      if (v25 <= 15) g25 = { level: 1, text: '좋음', color: '#3b82f6', bgClass: 'bg-air-good' };
+      else if (v25 <= 35) g25 = { level: 2, text: '보통', color: '#10b981', bgClass: 'bg-air-moderate' };
+      else if (v25 <= 75) g25 = { level: 3, text: '나쁨', color: '#f59e0b', bgClass: 'bg-air-bad' };
+      else g25 = { level: 4, text: '매우나쁨', color: '#ef4444', bgClass: 'bg-air-very-bad' };
+    }
+  }
+
+  if (g10 && g25) {
+    return g25.level > g10.level ? g25 : g10;
+  }
+  return g25 || g10 || { level: 2, text: '보통', color: '#10b981', bgClass: 'bg-air-moderate' };
+}
+
+function getAirGradeFromPm10(pm10) {
+  return getAirGrade(pm10, null);
 }
 
 const stationCodeToDistrict = {
-  '701': '중구',
-  '702': '남구',
-  '703': '수성구',
-  '704': '동구',
-  '705': '북구',
-  '707': '수성구',
-  '708': '북구',
-  '709': '서구',
-  '710': '달서구',
-  '711': '달성군',
-  '712': '수성구',
-  '713': '동구',
-  '714': '달성군',
-  '715': '동구',
-  '716': '달서구',
-  '717': '달성군',
-  '718': '달서구',
-  '719': '북구',
-  '720': '남구',
-  '721': '동구',
-  '802': '서구',
-  '803': '달서구'
+  '701': '중구',   // 수창동
+  '702': '수성구', // 지산동
+  '703': '동구',   // 서호동
+  '704': '서구',   // 이현동
+  '705': '남구',   // 대명동
+  '707': '동구',   // 신암동
+  '708': '북구',   // 태전동
+  '709': '수성구', // 만촌동
+  '710': '달서구', // 호림동
+  '711': '달성군', // 유가읍
+  '712': '수성구', // 시지동
+  '713': '달서구', // 진천동
+  '714': '달성군', // 다사읍
+  '715': '달서구', // 본동
+  '716': '북구',   // 산격동
+  '717': '달성군', // 화원읍
+  '718': '서구',   // 내당동
+  '719': '북구',   // 침산동
+  '720': '중구',   // 남산1동
+  '721': '군위군', // 군위읍
+  '802': '서구',   // 평리동
+  '803': '달서구', // 이곡동
+  '804': '남구',   // 충혼탑
+  '805': '북구',   // 서변동
+  '806': '수성구', // 연호동
+  '807': '동구'    // 용계동
 };
 
-async function fetchDistrictAirData() {
+let currentAirHour = 'all';
+
+async function fetchDistrictAirData(dateStr = currentAirDate, hourStr = currentAirHour) {
+  const modal = document.getElementById('air-modal');
+  const tbody = document.getElementById('district-summary-tbody');
+  
+  // 모달이 열려 있는 상태라면 표에 로딩 스피너 표시
+  if (tbody && modal && modal.style.display !== 'none') {
+    const timeLabel = (hourStr && hourStr !== 'all') ? `${hourStr}:00 ` : '';
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          <div style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+            <i data-lucide="loader" class="spin-animation" style="width:16px;height:16px;"></i>
+            <span>${dateStr ? dateStr + ' ' : ''}${timeLabel}대기 정보를 불러오는 중입니다...</span>
+          </div>
+        </td>
+      </tr>`;
+    if (window.lucide) lucide.createIcons();
+  }
+
   try {
-    const res = await fetch('/api/air/districts');
+    const params = [];
+    if (dateStr) params.push(`date=${encodeURIComponent(dateStr)}`);
+    if (hourStr && hourStr !== 'all') params.push(`hour=${encodeURIComponent(hourStr)}`);
+    const url = '/api/air/districts' + (params.length ? `?${params.join('&')}` : '');
+
+    const res = await fetch(url);
     const result = await res.json();
     if (result.success && result.districts) {
       currentDistrictAirData = { ...defaultDistrictAirData, ...result.districts };
+      // 26개 전체 측정소 목록(또는 8개구 대표) 종합 표 렌더링
+      const stationList = result.stations || Object.values(result.districts);
+      renderDistrictSummary(stationList);
+      // 26개 대기 측정소 실제 위치 핀(마커) 지도 표출
+      renderStationMarkers(stationList);
+      // 지도 행정동 SVG 색상 갱신
       if (leafletDongLayer) {
         leafletDongLayer.setStyle(getDongStyle);
       }
+    } else {
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">
+              해당 일자 및 시간의 대기 정보 데이터가 없습니다.
+            </td>
+          </tr>`;
+      }
     }
   } catch (err) {
-    console.error('자치구별 대기정보 로드 실패:', err);
+    console.error('대기정보 로드 실패:', err);
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 20px; color: #ef4444;">
+            데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+          </td>
+        </tr>`;
+    }
   }
 }
+
+// --------------------------------------------------------------------------
+// 1-2. 대구 26개 공식 대기 측정소 핀(마커) 지도 표출 & 툴팁 바인딩
+// --------------------------------------------------------------------------
+function renderStationMarkers(stations) {
+  if (!leafletMapInstance) return;
+  if (!stations || !stations.length) return;
+
+  allStationsList = stations;
+
+  if (!leafletStationLayerGroup) {
+    leafletStationLayerGroup = L.layerGroup();
+    if (isStationsOverlayOn) {
+      leafletStationLayerGroup.addTo(leafletMapInstance);
+    }
+  } else {
+    leafletStationLayerGroup.clearLayers();
+  }
+
+  stations.forEach(sttn => {
+    const lat = sttn.lat;
+    const lng = sttn.lng;
+    if (!lat || !lng) return;
+
+    const isRoadside = (sttn.network === '도로변대기' || (sttn.sttn_cd && String(sttn.sttn_cd).startsWith('8')));
+    const netClass = isRoadside ? 'roadside' : 'urban';
+    const netLabel = isRoadside ? '도로변대기' : '도시대기';
+    const stName = sttn.station_name || sttn.name || '';
+    const cleanName = stName.replace(/\(.*?\)/, '').trim();
+    const pm10Val = (sttn.pm10 !== undefined && sttn.pm10 !== null && sttn.pm10 !== '') ? sttn.pm10 : '-';
+    const pm25Val = (sttn.pm25 !== undefined && sttn.pm25 !== null && sttn.pm25 !== '') ? sttn.pm25 : '-';
+    const gradeColor = sttn.color || '#10b981';
+    const gradeText = sttn.text || '보통';
+
+    const customIcon = L.divIcon({
+      className: 'custom-sttn-icon',
+      html: `
+        <div class="station-pin-wrapper" title="${cleanName} 측정소 (${netLabel})">
+          <div class="sttn-pin-body ${netClass}">
+            <div class="sttn-pin-icon-inner">📍</div>
+          </div>
+          <span class="sttn-pin-label">${cleanName}</span>
+        </div>
+      `,
+      iconSize: [28, 34],
+      iconAnchor: [14, 28],
+      tooltipAnchor: [0, -30]
+    });
+
+    const marker = L.marker([lat, lng], { icon: customIcon });
+
+    marker.bindTooltip(`
+      <div class="sttn-tooltip-card">
+        <div class="sttc-header">
+          <div class="sttc-title">
+            <span>${stName} 측정소</span>
+            <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">(${sttn.sttn_cd})</span>
+          </div>
+          <span class="sttc-badge ${netClass}">${netLabel}</span>
+        </div>
+        <div class="sttc-address">
+          📍 ${sttn.address || '대구광역시 소재 측정소'}
+        </div>
+        <div class="sttc-grid">
+          <div class="sttc-grid-item">
+            <span class="sttc-grid-label">미세먼지 (PM10)</span>
+            <strong class="sttc-grid-val" style="color: #38bdf8;">${pm10Val} <small>㎍/㎥</small></strong>
+          </div>
+          <div class="sttc-grid-item">
+            <span class="sttc-grid-label">초미세먼지 (PM2.5)</span>
+            <strong class="sttc-grid-val" style="color: #a78bfa;">${pm25Val} <small>㎍/㎥</small></strong>
+          </div>
+        </div>
+        <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem;">
+          <span style="color: #94a3b8;">통합 대기질:</span>
+          <span style="background: ${gradeColor}25; color: ${gradeColor}; border: 1px solid ${gradeColor}60; padding: 1px 6px; border-radius: 4px; font-weight: 700;">
+            ${gradeText}
+          </span>
+        </div>
+      </div>
+    `, {
+      direction: 'top',
+      className: 'dong-leaflet-tooltip',
+      opacity: 0.98
+    });
+
+    marker.on('click', (e) => {
+      if (e.originalEvent) L.DomEvent.stopPropagation(e);
+      currentStationCode = sttn.sttn_cd;
+      fetchAirData(sttn.sttn_cd, currentAirDate);
+      const select = document.getElementById('station-select');
+      if (select) select.value = sttn.sttn_cd;
+    });
+
+    marker.addTo(leafletStationLayerGroup);
+  });
+}
+
 
 // --------------------------------------------------------------------------
 // 앱 초기화 라이프사이클
@@ -435,10 +608,9 @@ function onEachDongFeature(feature, layer) {
           <div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc; margin-bottom: 3px;">
             ${dist} <span style="color: #38bdf8;">${dong}</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: #cbd5e1;">
-            <span>미세먼지(PM10):</span>
-            <strong style="color: ${latestAir.color}; font-weight: 700;">${latestAir.pm10}㎍/㎥</strong>
-            <span style="background: ${latestAir.color}25; color: ${latestAir.color}; border: 1px solid ${latestAir.color}60; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 600;">${latestAir.text}</span>
+          <div style="display: flex; flex-direction: column; gap: 2px; font-size: 0.74rem; color: #cbd5e1;">
+            <div>PM10: <strong style="color: #38bdf8;">${latestAir.pm10 || '-'}㎍/㎥</strong> | PM2.5: <strong style="color: #a78bfa;">${latestAir.pm25 || '-'}㎍/㎥</strong></div>
+            <div style="margin-top: 2px;"><span style="background: ${latestAir.color}25; color: ${latestAir.color}; border: 1px solid ${latestAir.color}60; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 600;">통합 ${latestAir.text}</span></div>
           </div>
         </div>
       `);
@@ -582,6 +754,21 @@ function toggleNaverOverlay(type) {
         }
       }
     }
+  } else if (type === 'stations') {
+    isStationsOverlayOn = !isStationsOverlayOn;
+    if (leafletMapInstance) {
+      if (isStationsOverlayOn) {
+        if (leafletStationLayerGroup && !leafletMapInstance.hasLayer(leafletStationLayerGroup)) {
+          leafletStationLayerGroup.addTo(leafletMapInstance);
+        } else if (!leafletStationLayerGroup && allStationsList.length > 0) {
+          renderStationMarkers(allStationsList);
+        }
+      } else {
+        if (leafletStationLayerGroup && leafletMapInstance.hasLayer(leafletStationLayerGroup)) {
+          leafletMapInstance.removeLayer(leafletStationLayerGroup);
+        }
+      }
+    }
   }
 
   if (leafletMapInstance && leafletRouteLayerGroup && leafletMapInstance.hasLayer(leafletRouteLayerGroup)) {
@@ -603,6 +790,7 @@ function updateNaverControlsUI() {
   const nftSat = document.getElementById('nft-btn-sat');
   const nftDist = document.getElementById('nft-layer-dist');
   const nftRoute = document.getElementById('nft-layer-route');
+  const nftStation = document.getElementById('nft-layer-station');
 
   const isClean = currentMasterView === 'clean';
   const isSat = currentMasterView === 'satellite';
@@ -620,6 +808,8 @@ function updateNaverControlsUI() {
 
   if (btnRoutes) btnRoutes.classList.toggle('active', isRoutesOverlayOn);
   if (nftRoute) nftRoute.classList.toggle('active', isRoutesOverlayOn);
+
+  if (nftStation) nftStation.classList.toggle('active', isStationsOverlayOn);
 
   if (window.lucide) {
     lucide.createIcons();
@@ -645,25 +835,7 @@ async function fetchAirData(sttnCd = '701', dateStr = undefined, force = false) 
       updateAirUi(airData);
       renderAirTable(airData.records);
 
-      // 해당 측정소가 속한 자치구의 미세먼지 수치 실시간 갱신 & 지도 반영
-      if (airData.latest && airData.latest.pm10 && airData.latest.pm10.value) {
-        const val = parseInt(airData.latest.pm10.value, 10);
-        const distName = stationCodeToDistrict[sttnCd];
-        if (distName && !isNaN(val)) {
-          const grade = getAirGradeFromPm10(val);
-          currentDistrictAirData[distName] = {
-            district: distName,
-            sttn_cd: sttnCd,
-            pm10: val,
-            level: grade.level,
-            text: grade.text,
-            color: grade.color
-          };
-          if (leafletDongLayer) {
-            leafletDongLayer.setStyle(getDongStyle);
-          }
-        }
-      }
+      // 좌측 퀵 카드 및 상단 실시간 칩 UI만 업데이트 (지도 영역 색상은 초기 로드 및 모달 갱신 시 일괄 유지)
     }
   } catch (err) {
     console.error('실시간 대기정보 조회 실패:', err);
@@ -778,18 +950,61 @@ async function openAirModal() {
   const modal = document.getElementById('air-modal');
   if (modal) {
     modal.style.display = 'flex';
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
   }
-  // Fetch real-time overall district air summary and render
-  try {
-    const res = await fetch('/api/air/districts');
-    const result = await res.json();
-    if (result.success && result.districts) {
-      renderDistrictSummary(Object.values(result.districts));
+
+  // 모달 조회일자 인풋 동기화
+  const dateInput = document.getElementById('modal-date-input');
+  if (dateInput) {
+    if (currentAirDate) {
+      dateInput.value = currentAirDate;
+    } else if (!dateInput.value) {
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000;
+      dateInput.value = new Date(now.getTime() - offset).toISOString().split('T')[0];
     }
-  } catch (err) {
-    console.error('District summary fetch failed:', err);
   }
+
+  // 모달 시간 선택 셀렉트 동기화
+  const hourSelect = document.getElementById('modal-hour-select');
+  if (hourSelect) {
+    hourSelect.value = currentAirHour || 'all';
+  }
+
+  const modalSttnSelect = document.getElementById('modal-station-select');
+  if (modalSttnSelect && currentStationCode) {
+    modalSttnSelect.value = currentStationCode;
+  }
+
+  // 현재 설정된 날짜 및 시간 기준으로 전체 측정소 표 렌더링
+  await fetchDistrictAirData(currentAirDate, currentAirHour);
+}
+
+async function refreshAirModal(dateStr = currentAirDate, hourStr = currentAirHour, force = false) {
+  currentAirDate = dateStr || null;
+  currentAirHour = (hourStr !== undefined && hourStr !== null) ? hourStr : 'all';
+
+  const dateInput = document.getElementById('modal-date-input');
+  if (dateInput) {
+    if (currentAirDate) {
+      dateInput.value = currentAirDate;
+    } else {
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000;
+      dateInput.value = new Date(now.getTime() - offset).toISOString().split('T')[0];
+    }
+  }
+
+  const hourSelect = document.getElementById('modal-hour-select');
+  if (hourSelect) {
+    hourSelect.value = currentAirHour || 'all';
+  }
+
+  // 1. 측정소 상세 데이터 갱신
+  const p1 = fetchAirData(currentStationCode, currentAirDate, force);
+  // 2. 전체 측정소 표 및 지도 색상 동시 갱신
+  const p2 = fetchDistrictAirData(currentAirDate, currentAirHour);
+  await Promise.all([p1, p2]);
 }
 
 function closeAirModal() {
@@ -797,16 +1012,22 @@ function closeAirModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function renderDistrictSummary(districts) {
+function renderDistrictSummary(stations) {
   const tbody = document.getElementById('district-summary-tbody');
   if (!tbody) return;
-  const rows = districts.map(d => {
-    const gradeText = d.text || '';
-    const color = d.color || '#10b981';
+  const rows = stations.map(s => {
+    const sttnName = s.station_name || s.sttn_name || s.name || s.sttn_cd || '';
+    const distName = s.district || stationCodeToDistrict[s.sttn_cd] || '';
+    const gradeText = s.text || s.pm10_text || '';
+    const color = s.color || '#10b981';
+    const pm10Val = (s.pm10 !== undefined && s.pm10 !== null && s.pm10 !== '') ? s.pm10 : '-';
+    const pm25Val = (s.pm25 !== undefined && s.pm25 !== null && s.pm25 !== '') ? s.pm25 : '-';
     return `
       <tr>
-        <td>${d.district}</td>
-        <td>${d.pm10}</td>
+        <td style="font-weight: 700; color: var(--text-main);">${sttnName}</td>
+        <td style="color: var(--text-muted); font-size: 0.82rem;">${distName}</td>
+        <td style="font-weight: 700; color: #38bdf8;">${pm10Val}</td>
+        <td style="font-weight: 700; color: #a78bfa;">${pm25Val}</td>
         <td><span class="qm-tag" style="background:${color}25;color:${color};border:1px solid ${color}60;">
           ${gradeText}
         </span></td>
@@ -1305,9 +1526,19 @@ function setupEventListeners() {
   const modalDateInput = document.getElementById('modal-date-input');
   if (modalDateInput) {
     modalDateInput.addEventListener('change', (e) => {
+      const hourVal = document.getElementById('modal-hour-select')?.value || currentAirHour || 'all';
       if (e.target.value) {
-        fetchAirData(currentStationCode, e.target.value);
+        refreshAirModal(e.target.value, hourVal, true);
       }
+    });
+  }
+
+  // 모달 내 시간 직접 선택
+  const modalHourSelect = document.getElementById('modal-hour-select');
+  if (modalHourSelect) {
+    modalHourSelect.addEventListener('change', (e) => {
+      const dateVal = document.getElementById('modal-date-input')?.value || currentAirDate;
+      refreshAirModal(dateVal, e.target.value, true);
     });
   }
 
@@ -1381,7 +1612,7 @@ if (window._pendingMasterView) {
 }
 
 // ==========================================================================
-// 데모용: 특정 날짜 대기 데이터 전체 로드 & 지도 색상 갱신
+// 데모용: 특정 날짜 대기 데이터 전체 로드 & 지도 색상 및 모달 표 갱신
 // ==========================================================================
 async function loadDemoAirDate(dateStr) {
   const demoBtn = document.getElementById('btn-demo-date');
@@ -1390,30 +1621,28 @@ async function loadDemoAirDate(dateStr) {
   // 버튼 로딩 상태
   if (demoBtn) {
     demoBtn.disabled = true;
-    demoBtn.innerHTML = '<i data-lucide="loader"></i><span>불러오는 중...</span>';
+    demoBtn.innerHTML = '<i data-lucide="loader" class="spin-animation"></i><span>불러오는 중...</span>';
     if (window.lucide) lucide.createIcons();
+  }
+
+  currentAirDate = dateStr;
+  currentAirHour = 'all';
+
+  // 모달 조회일자 인풋 동기화
+  const dateInput = document.getElementById('modal-date-input');
+  if (dateInput) {
+    dateInput.value = dateStr;
+  }
+  const hourSelect = document.getElementById('modal-hour-select');
+  if (hourSelect) {
+    hourSelect.value = 'all';
   }
 
   // 1. 현재 측정소의 해당 날짜 데이터로 퀵카드 & 헤더 갱신
   await fetchAirData(currentStationCode, dateStr, true);
 
-  // 2. 단일 URL로 전체 자치구 PM10 한번에 가져오기 (/api/air/districts?date=)
-  try {
-    const res = await fetch(`/api/air/districts?date=${encodeURIComponent(dateStr)}`);
-    const result = await res.json();
-    if (result.success && result.districts) {
-      // currentDistrictAirData 갱신
-      Object.entries(result.districts).forEach(([dist, info]) => {
-        currentDistrictAirData[dist] = info;
-      });
-      // 지도 색상 즉시 갱신
-      if (leafletDongLayer) {
-        leafletDongLayer.setStyle(getDongStyle);
-      }
-    }
-  } catch (e) {
-    console.warn('[DemoDate] 자치구 데이터 로드 실패:', e);
-  }
+  // 2. 단일 URL로 전체 자치구 PM10 가져오기 + 지도 색상 및 모달 표 동시 갱신
+  await fetchDistrictAirData(dateStr, 'all');
 
   // 버튼 UI 전환 (데모 → 복귀 버튼 표시)
   if (demoBtn) {
@@ -1431,13 +1660,24 @@ async function resetToRealtimeAir() {
   const demoBtn = document.getElementById('btn-demo-date');
   const resetBtn = document.getElementById('btn-demo-reset');
 
+  currentAirDate = null;
+  currentAirHour = 'all';
+
+  // 모달 날짜 인풋 오늘 날짜로 복귀
+  const dateInput = document.getElementById('modal-date-input');
+  if (dateInput) {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    dateInput.value = new Date(now.getTime() - offset).toISOString().split('T')[0];
+  }
+  const hourSelect = document.getElementById('modal-hour-select');
+  if (hourSelect) {
+    hourSelect.value = 'all';
+  }
+
   // 실시간 날짜(오늘)로 복귀
   await fetchAirData(currentStationCode, null, true);
-  await fetchDistrictAirData();
-
-  if (leafletDongLayer) {
-    leafletDongLayer.setStyle(getDongStyle);
-  }
+  await fetchDistrictAirData(null, 'all');
 
   if (resetBtn) resetBtn.style.display = 'none';
   if (demoBtn) {
@@ -1448,3 +1688,6 @@ async function resetToRealtimeAir() {
 
 window.loadDemoAirDate = loadDemoAirDate;
 window.resetToRealtimeAir = resetToRealtimeAir;
+window.refreshAirModal = refreshAirModal;
+window.fetchDistrictAirData = fetchDistrictAirData;
+
