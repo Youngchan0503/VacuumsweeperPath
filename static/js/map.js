@@ -1397,32 +1397,22 @@ async function loadDemoAirDate(dateStr) {
   // 1. 현재 측정소의 해당 날짜 데이터로 퀵카드 & 헤더 갱신
   await fetchAirData(currentStationCode, dateStr, true);
 
-  // 2. 8개 자치구 대표 측정소 해당 날짜 데이터 병렬 fetch
-  const districtStationMap = {
-    '중구': '701', '남구': '702', '수성구': '703', '동구': '704',
-    '북구': '705', '서구': '709', '달서구': '710', '달성군': '714'
-  };
-
-  await Promise.all(Object.entries(districtStationMap).map(async ([dist, sttn_cd]) => {
-    try {
-      const res = await fetch(`/api/air/realtime?sttn_cd=${sttn_cd}&date=${encodeURIComponent(dateStr)}`);
-      const result = await res.json();
-      const latest = result?.data?.latest;
-      if (latest?.pm10?.value) {
-        const val = parseInt(latest.pm10.value, 10);
-        if (!isNaN(val)) {
-          const grade = getAirGradeFromPm10(val);
-          currentDistrictAirData[dist] = { district: dist, sttn_cd, pm10: val, ...grade };
-        }
+  // 2. 단일 URL로 전체 자치구 PM10 한번에 가져오기 (/api/air/districts?date=)
+  try {
+    const res = await fetch(`/api/air/districts?date=${encodeURIComponent(dateStr)}`);
+    const result = await res.json();
+    if (result.success && result.districts) {
+      // currentDistrictAirData 갱신
+      Object.entries(result.districts).forEach(([dist, info]) => {
+        currentDistrictAirData[dist] = info;
+      });
+      // 지도 색상 즉시 갱신
+      if (leafletDongLayer) {
+        leafletDongLayer.setStyle(getDongStyle);
       }
-    } catch (e) {
-      console.warn(`[DemoDate] ${dist}(${sttn_cd}) 로드 실패:`, e);
     }
-  }));
-
-  // 3. 지도 색상 즉시 갱신
-  if (leafletDongLayer) {
-    leafletDongLayer.setStyle(getDongStyle);
+  } catch (e) {
+    console.warn('[DemoDate] 자치구 데이터 로드 실패:', e);
   }
 
   // 버튼 UI 전환 (데모 → 복귀 버튼 표시)

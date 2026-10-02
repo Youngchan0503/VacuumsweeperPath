@@ -69,7 +69,8 @@ def api_air_realtime():
 @app.route('/api/air/districts', methods=['GET'])
 def api_air_districts():
     """8개 자치구별 미세먼지(PM10) 등급 및 색상 데이터 API"""
-    data = collector.get_all_districts_air_summary()
+    date_str = request.args.get('date')  # 미지정 시 오늘 실시간
+    data = collector.get_all_districts_air_summary(date_str=date_str)
     return jsonify({'success': True, 'districts': data})
 
 @app.route('/api/daegu/dong-geojson', methods=['GET'])

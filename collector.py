@@ -274,56 +274,171 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
     _cleanup_old_cache(keep_days=2)
     return result
 
-def get_all_districts_air_summary():
-    """8개 자치구 대표 측정소 미세먼지(PM10) 및 등급 종합 반환 (실시간 크롤링 우선)"""
+# locationRealTimeView URL에서 sttn_cd 순서 (헤더 컬럼 순서와 1:1 매핑)
+_MULTI_STTN_ORDER = [
+    '701','702','703','704','705','707','708','709',
+    '710','711','712','713','714','715','716','717',
+    '718','719','720','721','802','803','804','805','806','807'
+]
+
+def crawl_all_stations_pm10(date_str=None):
+    """
+    locationRealTimeView 단일 URL로 전체 측정소 PM10 데이터 한번에 크롤링.
+    반환: {sttn_cd: {'pm10': int, 'level': int, 'text': str, 'color': str}}
+    """
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    is_today = (not date_str) or (date_str == today_str)
+    if not date_str:
+        date_str = today_str
+
+    # 캐시 키
+    if is_today:
+        now_hour = datetime.now().strftime('%H')
+        cache_key = f"all_stations_{date_str}_{now_hour}"
+    else:
+        cache_key = f"all_stations_{date_str}_all"
+
+    cached = _load_cache(cache_key)
+    if cached:
+        print(f"[AirCache] 전체측정소 캐시 HIT: {cache_key}")
+        return cached
+
+    sttn_params = '&'.join(f'sttn_cd={cd}' for cd in _MULTI_STTN_ORDER)
+    url = (
+        f"https://air.daegu.go.kr/index.do?period_type=HOUR"
+        f"&menu_id=00000741"
+        f"&menu_link=%2Ffront%2FrealTime%2FlocationRealTimeView.do"
+        f"&ntw=1%2C2&{sttn_params}"
+        f"&from={date_str}&fromtime=00&to={date_str}&totime=23&itm=8"
+    )
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    })
+
+    try:
+        html = urllib.request.urlopen(req, context=ctx, timeout=15).read().decode('utf-8', errors='ignore')
+    except Exception as e:
+        print(f"[AirCrawler] 전체측정소 크롤링 오류: {e}")
+        return {}
+
+    soup = BeautifulSoup(html, 'html.parser')
+    tables = soup.find_all('table')
+    if len(tables) < 2:
+        return {}
+
+    # table[1]: 등급+값 포함 버전
+    t = tables[1]
+    rows = t.find_all('tr')
+    if len(rows) < 2:
+        return {}
+
+    # 데이터 row 중 값이 있는 마지막 row 찾기
+    latest_vals = None
+    for row in reversed(rows[1:]):
+        tds = [c.get_text(strip=True) for c in row.find_all('td')]
+        # 값 컬럼: col 1 = 등급, col 2 = 값 (colspan=2 구조)
+        # tds 구조: [시간, 등급1, 값1, 등급2, 값2, ...]
+        vals = tds[2::2]  # 값만 추출 (인덱스 2, 4, 6, ...)
+        if any(v not in ('', '-') for v in vals):
+            latest_vals = (tds[0], vals)  # (시간, [값...])
+            break
+
+    if not latest_vals:
+        return {}
+
+    time_str, pm10_values = latest_vals
+
+    def _pm10_grade(val):
+        if val <= 30:   return {'level': 1, 'text': '좋음',    'color': '#3b82f6'}
+        elif val <= 80: return {'level': 2, 'text': '보통',    'color': '#10b981'}
+        elif val <= 150:return {'level': 3, 'text': '나쁨',    'color': '#f59e0b'}
+        else:           return {'level': 4, 'text': '매우나쁨', 'color': '#ef4444'}
+
+    result = {}
+    for i, sttn_cd in enumerate(_MULTI_STTN_ORDER):
+        if i >= len(pm10_values):
+            break
+        raw = pm10_values[i]
+        try:
+            val = int(raw)
+        except (ValueError, TypeError):
+            continue
+        grade = _pm10_grade(val)
+        result[sttn_cd] = {
+            'sttn_cd': sttn_cd,
+            'station_name': STATION_NAMES.get(sttn_cd, sttn_cd),
+            'pm10': val,
+            'time': time_str,
+            **grade
+        }
+
+    print(f"[AirCrawler] 전체측정소 PM10 크롤링 완료: {len(result)}개 ({time_str})")
+    _save_cache(cache_key, result)
+    _cleanup_old_cache(keep_days=2)
+    return result
+
+
+def get_all_districts_air_summary(date_str=None):
+    """
+    8개 자치구 대표 측정소 PM10 등급 종합 반환.
+    단일 URL로 전체 측정소 한번에 크롤링 (기존 8회 → 1회).
+    실패 시 개별 크롤링으로 fallback.
+    """
     data = load_daegu_data()
     stations_data = {s['district']: s['pm10'] for s in data.get('monitoring_stations', [])}
-    
+
+    # 단일 URL 전체측정소 크롤링 (1회 요청)
+    all_pm10 = crawl_all_stations_pm10(date_str=date_str)
+
     results = {}
     for dist, sttn_info in DISTRICT_STATION_MAP.items():
         sttn_cd = sttn_info['sttn_cd']
         sttn_name = sttn_info['name']
         base_pm10 = stations_data.get(dist, 65)
 
-        # crawl_daegu_realtime_air 내부에서 파일 캐시 → 메모리 캐시 → 실시간 크롤링 순서로 처리
-        # 서버 재시작 후에도 파일 캐시가 있으면 즉시 반환되므로 별도 캐시 탐색 불필요
-        try:
-            realtime = crawl_daegu_realtime_air(sttn_cd=sttn_cd)
-            latest = realtime.get('latest')
-            if latest and latest.get('pm10') and latest['pm10'].get('value'):
-                val = int(latest['pm10']['value'])
-            else:
-                val = base_pm10
-        except Exception as e:
-            print(f"[AirSummary] {dist}({sttn_cd}) 크롤링 실패 → 기본값 사용: {e}")
-            val = base_pm10
-            
-        # PM10 등급 판정 (AirKorea 기준: 좋음 0~30, 보통 31~80, 나쁨 81~150, 매우나쁨 151~)
-        if val <= 30:
-            level = 1
-            text = '좋음'
-            color = '#3b82f6'
-        elif val <= 80:
-            level = 2
-            text = '보통'
-            color = '#10b981'
-        elif val <= 150:
-            level = 3
-            text = '나쁨'
-            color = '#f59e0b'
+        station_data = all_pm10.get(sttn_cd)
+        if station_data:
+            val = station_data['pm10']
+            results[dist] = {
+                'district': dist,
+                'sttn_cd': sttn_cd,
+                'sttn_name': sttn_name,
+                'pm10': val,
+                'level': station_data['level'],
+                'text': station_data['text'],
+                'color': station_data['color']
+            }
         else:
-            level = 4
-            text = '매우나쁨'
-            color = '#ef4444'
-            
-        results[dist] = {
-            'district': dist,
-            'sttn_cd': sttn_cd,
-            'sttn_name': sttn_name,
-            'pm10': val,
-            'level': level,
-            'text': text,
-            'color': color
-        }
+            # fallback: 개별 크롤링
+            try:
+                realtime = crawl_daegu_realtime_air(sttn_cd=sttn_cd, date_str=date_str)
+                latest = realtime.get('latest')
+                raw_val = latest['pm10']['value'] if latest and latest.get('pm10') else None
+                val = int(raw_val) if raw_val and raw_val not in ('-', '') else base_pm10
+            except Exception as e:
+                print(f"[AirSummary] {dist}({sttn_cd}) fallback 실패 → 기본값: {e}")
+                val = base_pm10
+
+            def _grade(v):
+                if v <= 30:   return 1, '좋음',    '#3b82f6'
+                elif v <= 80: return 2, '보통',    '#10b981'
+                elif v <= 150:return 3, '나쁨',    '#f59e0b'
+                else:         return 4, '매우나쁨', '#ef4444'
+            level, text, color = _grade(val)
+
+            results[dist] = {
+                'district': dist,
+                'sttn_cd': sttn_cd,
+                'sttn_name': sttn_name,
+                'pm10': val,
+                'level': level,
+                'text': text,
+                'color': color
+            }
+
     return results
 
