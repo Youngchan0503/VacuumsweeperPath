@@ -1,4 +1,5 @@
 import os
+import threading
 from flask import Flask, render_template, jsonify, request
 import config
 import collector
@@ -6,6 +7,27 @@ import analyzer
 
 app = Flask(__name__)
 app.secret_key = 'daegu-dust-vehicle-analysis-2026'
+
+# ==========================================================================
+# 서버 시작 시 캐시 워밍업 (Render 배포 후 첫 사용자 접속 전 미리 크롤링)
+# 백그라운드 스레드로 실행하므로 서버 응답 지연 없음
+# ==========================================================================
+def _warmup_air_cache():
+    """8개 자치구 대표 측정소 대기 데이터를 서버 시작 시 미리 캐싱"""
+    import time
+    time.sleep(2)  # 서버가 완전히 뜬 후 시작
+    print("[Warmup] 대기 캐시 워밍업 시작 (8개 자치구)...")
+    for dist, info in collector.DISTRICT_STATION_MAP.items():
+        try:
+            collector.crawl_daegu_realtime_air(sttn_cd=info['sttn_cd'])
+            print(f"[Warmup] {dist}({info['sttn_cd']}) 캐시 완료")
+        except Exception as e:
+            print(f"[Warmup] {dist}({info['sttn_cd']}) 실패: {e}")
+    print("[Warmup] 대기 캐시 워밍업 완료 ✓")
+
+# gunicorn/로컬 모두에서 한 번만 실행 (daemon=True: 앱 종료 시 자동 종료)
+_warmup_thread = threading.Thread(target=_warmup_air_cache, daemon=True)
+_warmup_thread.start()
 
 @app.route('/')
 def index():

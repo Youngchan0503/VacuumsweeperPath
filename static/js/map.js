@@ -173,9 +173,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. 백엔드 분진차량 및 경로 데이터 로드
   await loadBackendData();
 
-  // 1-2. 8개 자치구 미세먼지(PM10) 대기질 데이터 비동기 로드
-  await fetchDistrictAirData();
-
   // 2. 통합 인터랙티브 지도 초기화 (일반/위성사진 베이스맵)
   initRoadLeafletMap();
 
@@ -185,8 +182,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. 전역 이벤트 리스너 등록
   setupEventListeners();
 
-  // 5. 실시간 대기정보 첫 로드
+  // 5. 실시간 대기정보 첫 로드 (GeoJSON 로드 이후에 호출해야 leafletDongLayer.setStyle이 동작함)
   await fetchAirData(currentStationCode);
+
+  // 5-2. 8개 자치구 미세먼지(PM10) 대기질 데이터 비동기 로드 및 지도 색상 즉시 갱신
+  //      (GeoJSON 레이어가 이미 생성된 후 호출하므로 setStyle이 올바르게 동작함)
+  await fetchDistrictAirData();
 
   // 6. 초기 화면: 특정 자치구 강제 선택 없이 대구 전역 균일 조망
   if (leafletMapInstance && leafletRoutePolylines && leafletRoutePolylines.length > 0) {
@@ -1379,3 +1380,81 @@ if (window._pendingMasterView) {
   setMasterView(window._pendingMasterView);
 }
 
+// ==========================================================================
+// 데모용: 특정 날짜 대기 데이터 전체 로드 & 지도 색상 갱신
+// ==========================================================================
+async function loadDemoAirDate(dateStr) {
+  const demoBtn = document.getElementById('btn-demo-date');
+  const resetBtn = document.getElementById('btn-demo-reset');
+
+  // 버튼 로딩 상태
+  if (demoBtn) {
+    demoBtn.disabled = true;
+    demoBtn.innerHTML = '<i data-lucide="loader"></i><span>불러오는 중...</span>';
+    if (window.lucide) lucide.createIcons();
+  }
+
+  // 1. 현재 측정소의 해당 날짜 데이터로 퀵카드 & 헤더 갱신
+  await fetchAirData(currentStationCode, dateStr, true);
+
+  // 2. 8개 자치구 대표 측정소 해당 날짜 데이터 병렬 fetch
+  const districtStationMap = {
+    '중구': '701', '남구': '702', '수성구': '703', '동구': '704',
+    '북구': '705', '서구': '709', '달서구': '710', '달성군': '714'
+  };
+
+  await Promise.all(Object.entries(districtStationMap).map(async ([dist, sttn_cd]) => {
+    try {
+      const res = await fetch(`/api/air/realtime?sttn_cd=${sttn_cd}&date=${encodeURIComponent(dateStr)}`);
+      const result = await res.json();
+      const latest = result?.data?.latest;
+      if (latest?.pm10?.value) {
+        const val = parseInt(latest.pm10.value, 10);
+        if (!isNaN(val)) {
+          const grade = getAirGradeFromPm10(val);
+          currentDistrictAirData[dist] = { district: dist, sttn_cd, pm10: val, ...grade };
+        }
+      }
+    } catch (e) {
+      console.warn(`[DemoDate] ${dist}(${sttn_cd}) 로드 실패:`, e);
+    }
+  }));
+
+  // 3. 지도 색상 즉시 갱신
+  if (leafletDongLayer) {
+    leafletDongLayer.setStyle(getDongStyle);
+  }
+
+  // 버튼 UI 전환 (데모 → 복귀 버튼 표시)
+  if (demoBtn) {
+    demoBtn.style.display = 'none';
+    demoBtn.disabled = false;
+    demoBtn.innerHTML = '<i data-lucide="calendar-clock"></i><span>📅 2026-03-24 데모 데이터 보기</span>';
+  }
+  if (resetBtn) {
+    resetBtn.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+async function resetToRealtimeAir() {
+  const demoBtn = document.getElementById('btn-demo-date');
+  const resetBtn = document.getElementById('btn-demo-reset');
+
+  // 실시간 날짜(오늘)로 복귀
+  await fetchAirData(currentStationCode, null, true);
+  await fetchDistrictAirData();
+
+  if (leafletDongLayer) {
+    leafletDongLayer.setStyle(getDongStyle);
+  }
+
+  if (resetBtn) resetBtn.style.display = 'none';
+  if (demoBtn) {
+    demoBtn.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+window.loadDemoAirDate = loadDemoAirDate;
+window.resetToRealtimeAir = resetToRealtimeAir;

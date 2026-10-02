@@ -197,6 +197,18 @@
           </button>
         </div>
 
+        <!-- 데모용: 특정 날짜 대기 데이터 지도 반영 버튼 -->
+        <div id="demo-date-wrap" style="margin-top: 8px;">
+          <button id="btn-demo-date" class="demo-date-btn" onclick="loadDemoAirDate('2026-03-24')" title="2026-03-24 대기 데이터로 지도 색상 업데이트 (데모용)">
+            <i data-lucide="calendar-clock"></i>
+            <span>📅 2026-03-24 데모 데이터 보기</span>
+          </button>
+          <button id="btn-demo-reset" class="demo-date-btn demo-reset-btn" onclick="resetToRealtimeAir()" title="실시간 데이터로 복귀" style="display:none;">
+            <i data-lucide="radio"></i>
+            <span>↩ 실시간 데이터로 복귀</span>
+          </button>
+        </div>
+
         <!-- 지도 범례: 미세먼지(PM10) 대기질 등급 & 관제 도로망 -->
         <div class="legend-box" id="map-legend">
           <div class="legend-title">미세먼지(PM10) 대기질 범례</div>

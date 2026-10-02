@@ -1478,3 +1478,47 @@ path.selected-dong-neon-path {
     display: none;
   }
 }
+
+/* ==========================================================================
+   데모용 날짜 버튼
+   ========================================================================== */
+.demo-date-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+  letter-spacing: 0.01em;
+}
+.demo-date-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.demo-date-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+.demo-date-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.demo-reset-btn {
+  margin-top: 5px;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.07);
+  color: #38bdf8;
+}
+.demo-reset-btn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.55);
+}

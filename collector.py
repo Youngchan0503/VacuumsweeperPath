@@ -7,9 +7,62 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import config
 
-# 캐시 저장소
-_AIR_CACHE = {}
-_CACHE_TIME = {}
+# ==========================================================================
+# 파일 기반 시간별 캐시 (서버 재시작 후에도 유지, 정각 단위로 캐시 공유)
+# 캐시 키 형식: {sttn_cd}_{YYYY-MM-DD}_{HH}  (14:10이든 14:59이든 '14' 동일)
+# ==========================================================================
+_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'data', 'air_cache')
+os.makedirs(_CACHE_DIR, exist_ok=True)
+
+# 메모리 캐시 (파일 읽기 횟수 최소화용 2차 캐시)
+_MEM_CACHE = {}
+
+def _get_hour_cache_key(sttn_cd: str, date_str: str) -> str:
+    """현재 시각 기준 시간 단위 캐시 키 생성 (예: 701_2026-10-02_14)"""
+    now_hour = datetime.now().strftime('%H')
+    return f"{sttn_cd}_{date_str}_{now_hour}"
+
+def _cache_file_path(cache_key: str) -> str:
+    return os.path.join(_CACHE_DIR, f"{cache_key}.json")
+
+def _load_cache(cache_key: str):
+    """파일 캐시 → 메모리 캐시 순서로 조회. 없으면 None 반환."""
+    if cache_key in _MEM_CACHE:
+        return _MEM_CACHE[cache_key]
+    fpath = _cache_file_path(cache_key)
+    if os.path.exists(fpath):
+        try:
+            with open(fpath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            _MEM_CACHE[cache_key] = data
+            return data
+        except Exception as e:
+            print(f"[AirCache] 캐시 파일 읽기 실패 ({fpath}): {e}")
+    return None
+
+def _save_cache(cache_key: str, data: dict):
+    """메모리 + 파일 양쪽에 캐시 저장."""
+    _MEM_CACHE[cache_key] = data
+    fpath = _cache_file_path(cache_key)
+    try:
+        with open(fpath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[AirCache] 캐시 파일 저장 실패 ({fpath}): {e}")
+
+def _cleanup_old_cache(keep_days: int = 2):
+    """오래된 캐시 파일 정리 (기본 2일 이상 지난 파일 삭제)"""
+    now = datetime.now()
+    try:
+        for fname in os.listdir(_CACHE_DIR):
+            fpath = os.path.join(_CACHE_DIR, fname)
+            if not fname.endswith('.json'):
+                continue
+            mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
+            if (now - mtime).days >= keep_days:
+                os.remove(fpath)
+    except Exception as e:
+        print(f"[AirCache] 캐시 정리 실패: {e}")
 
 # 자치구별 대표 대기측정소 매핑
 DISTRICT_STATION_MAP = {
@@ -76,18 +129,27 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
     """
     대구광역시 실시간 대기정보 시스템 크롤링
     대상 URL: https://air.daegu.go.kr/front/realTimeAir/realTimeTotalAirView.do
-    date_str 미지정 시 현재 날짜(오늘, YYYY-MM-DD)를 동적으로 조회합니다.
+    - date_str 미지정 시 현재 날짜(오늘) 자동 적용
+    - 캐시 키: {sttn_cd}_{date}_{hour} → 같은 시간대 재접속 시 파일 캐시 즉시 반환
+    - 과거 날짜 조회는 시간 단위 캐시 키 없이 날짜+시간 고정 캐시 사용
     """
     today_str = datetime.now().strftime('%Y-%m-%d')
+    is_today = (not date_str) or (date_str == today_str)
     if not date_str:
         date_str = today_str
 
-    cache_key = f"{sttn_cd}_{date_str}"
-    now_ts = datetime.now().timestamp()
-    
-    # 2분 이내 캐시 유효 시 반환
-    if cache_key in _AIR_CACHE and (now_ts - _CACHE_TIME.get(cache_key, 0) < 120):
-        return _AIR_CACHE[cache_key]
+    # 오늘 데이터: 시간 단위 캐시 키 (14:10 = 14:59 동일 키)
+    # 과거 데이터: 날짜 고정 캐시 키 (변하지 않으므로 시간 무관)
+    if is_today:
+        cache_key = _get_hour_cache_key(sttn_cd, date_str)
+    else:
+        cache_key = f"{sttn_cd}_{date_str}_all"
+
+    # 파일/메모리 캐시 확인 → 있으면 즉시 반환 (크롤링 없음)
+    cached = _load_cache(cache_key)
+    if cached:
+        print(f"[AirCache] 캐시 HIT: {cache_key}")
+        return cached
 
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -206,12 +268,14 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
         'latest': latest_rec
     }
 
-    _AIR_CACHE[cache_key] = result
-    _CACHE_TIME[cache_key] = now_ts
+    # 파일 + 메모리 양쪽에 캐시 저장 (서버 재시작 후에도 즉시 사용 가능)
+    _save_cache(cache_key, result)
+    # 오래된 캐시 파일 정리 (2일 이상)
+    _cleanup_old_cache(keep_days=2)
     return result
 
 def get_all_districts_air_summary():
-    """8개 자치구 대표 측정소 미세먼지(PM10) 및 등급 종합 반환"""
+    """8개 자치구 대표 측정소 미세먼지(PM10) 및 등급 종합 반환 (실시간 크롤링 우선)"""
     data = load_daegu_data()
     stations_data = {s['district']: s['pm10'] for s in data.get('monitoring_stations', [])}
     
@@ -220,20 +284,18 @@ def get_all_districts_air_summary():
         sttn_cd = sttn_info['sttn_cd']
         sttn_name = sttn_info['name']
         base_pm10 = stations_data.get(dist, 65)
-        
-        # 캐시에 실시간 크롤링 데이터가 있으면 최신값 사용
-        cached = None
-        for k, v in _AIR_CACHE.items():
-            if k.startswith(sttn_cd) and v.get('latest'):
-                cached = v['latest']
-                break
-        
-        if cached and cached.get('pm10') and cached['pm10'].get('value'):
-            try:
-                val = int(cached['pm10']['value'])
-            except:
+
+        # crawl_daegu_realtime_air 내부에서 파일 캐시 → 메모리 캐시 → 실시간 크롤링 순서로 처리
+        # 서버 재시작 후에도 파일 캐시가 있으면 즉시 반환되므로 별도 캐시 탐색 불필요
+        try:
+            realtime = crawl_daegu_realtime_air(sttn_cd=sttn_cd)
+            latest = realtime.get('latest')
+            if latest and latest.get('pm10') and latest['pm10'].get('value'):
+                val = int(latest['pm10']['value'])
+            else:
                 val = base_pm10
-        else:
+        except Exception as e:
+            print(f"[AirSummary] {dist}({sttn_cd}) 크롤링 실패 → 기본값 사용: {e}")
             val = base_pm10
             
         # PM10 등급 판정 (AirKorea 기준: 좋음 0~30, 보통 31~80, 나쁨 81~150, 매우나쁨 151~)
