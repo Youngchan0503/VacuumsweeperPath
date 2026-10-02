@@ -62,7 +62,7 @@
   </script>
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261002_soft_border_v4" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261002_soft_border_v4';">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261002_soft_border_v5" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261002_soft_border_v5';">
 </head>
 <body>
 
@@ -318,12 +318,12 @@
 
           <div class="amh-controls">
             <div class="modal-control-group">
-              <label for="modal-date-input"><i data-lucide="calendar" style="width:12px; height:12px;"></i> 조회일자</label>
-              <input type="date" id="modal-date-input" class="custom-select" style="width: 135px; cursor: pointer;" title="조회 날짜 선택">
+              <label for="modal-date-input"><i data-lucide="calendar" style="width:16px; height:16px;"></i> 조회일자</label>
+              <input type="date" id="modal-date-input" class="custom-select" style="width: 165px; height: 40px; cursor: pointer;" title="조회 날짜 선택">
             </div>
             <div class="modal-control-group">
-              <label for="modal-hour-select"><i data-lucide="clock" style="width:12px; height:12px;"></i> 조회시간</label>
-              <select id="modal-hour-select" class="custom-select" style="width: 145px; cursor: pointer;">
+              <label for="modal-hour-select"><i data-lucide="clock" style="width:16px; height:16px;"></i> 조회시간</label>
+              <select id="modal-hour-select" class="custom-select" style="width: 185px; height: 40px; cursor: pointer;">
                 <option value="all">전체 (일평균/최신)</option>
                 <option value="01">01:00</option>
                 <option value="02">02:00</option>
@@ -352,15 +352,15 @@
               </select>
             </div>
             <div class="amh-buttons">
-              <button class="action-btn" id="btn-air-today" onclick="refreshAirModal(null, 'all', true)" title="오늘 최신 실시간 데이터로 복귀" style="height: 32px;">
+              <button class="action-btn" id="btn-air-today" onclick="refreshAirModal(null, 'all', true)" title="오늘 최신 실시간 데이터로 복귀" style="height: 40px; padding: 0 14px;">
                 <i data-lucide="clock"></i>
                 <span>오늘 실시간</span>
               </button>
-              <button class="action-btn" id="btn-modal-refresh" onclick="refreshAirModal(document.getElementById('modal-date-input')?.value || currentAirDate, document.getElementById('modal-hour-select')?.value || currentAirHour, true)" title="실시간 데이터 새로고침" style="height: 32px;">
+              <button class="action-btn" id="btn-modal-refresh" onclick="refreshAirModal(document.getElementById('modal-date-input')?.value || currentAirDate, document.getElementById('modal-hour-select')?.value || currentAirHour, true)" title="실시간 데이터 새로고침" style="height: 40px; padding: 0 14px;">
                 <i data-lucide="refresh-cw"></i>
                 <span>새로고침</span>
               </button>
-              <button class="modal-close-btn" onclick="closeAirModal()" style="height: 32px; width: 32px;">
+              <button class="modal-close-btn" onclick="closeAirModal()" style="height: 40px; width: 40px;">
                 <i data-lucide="x"></i>
               </button>
             </div>
@@ -411,7 +411,7 @@
   </div>
 
   <!-- 지도 및 실시간 대기 스크립트 (캐시 무효화 및 직접/Live Server 실행 폴백 지원) -->
-  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_uniform_alpha_v12" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_uniform_alpha_v12';"></script>
+  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_sync_values_v17" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_sync_values_v17';"></script>
   <script>
     if (window.lucide) {
       lucide.createIcons();

@@ -4,6 +4,7 @@ from flask import Flask, render_template, jsonify, request
 import config
 import collector
 import analyzer
+import interpolator
 
 app = Flask(__name__)
 app.secret_key = 'daegu-dust-vehicle-analysis-2026'
@@ -68,15 +69,18 @@ def api_air_realtime():
 
 @app.route('/api/air/districts', methods=['GET'])
 def api_air_districts():
-    """8개 자치구 대표 데이터 및 26개 전체 측정소 대기정보 API"""
+    """8개 자치구 대표 데이터, 26개 전체 측정소 및 142개 읍·면·동별 IDW 정밀 대기정보 API"""
     date_str = request.args.get('date')  # 미지정 시 오늘 실시간
     hour_str = request.args.get('hour')  # 미지정/all 시 일평균/최신
     districts = collector.get_all_districts_air_summary(date_str=date_str, hour_str=hour_str)
     all_stations = collector.crawl_all_stations_pm10(date_str=date_str, hour_str=hour_str)
+    # daegu_dust2.ipynb 기반 142개 읍·면·동 IDW 공간 보간 계산
+    dong_idw_data = interpolator.get_dong_idw_air(all_stations)
     return jsonify({
         'success': True,
         'districts': districts,
-        'stations': list(all_stations.values())
+        'stations': list(all_stations.values()),
+        'dongs': dong_idw_data
     })
 
 @app.route('/api/air/stations', methods=['GET'])

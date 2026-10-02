@@ -79,7 +79,7 @@ const districtNameToId = {
   '달성군': 'dalseonggun'
 };
 
-// 자치구별 대표 대기측정소 매핑
+// 자치구별 대표 대기측정소 기본 매핑
 const districtToStation = {
   '중구': '701',    // 수창동
   '남구': '705',    // 대명동
@@ -90,6 +90,93 @@ const districtToStation = {
   '달서구': '803',  // 이곡동
   '달성군': '714'   // 다사읍
 };
+
+// 동·읍·면별 가장 가까운 실제 26개 대기측정소 정밀 매핑 사전 (대구 142개 행정동 100% 매핑)
+const dongToStationMap = {
+  // 1. 동구 (혁신도시/안심 -> 서호동 703, 용계/율하/방촌/해안 -> 용계동 807, 신암/신천/효목/공산/불로 -> 신암동 707)
+  '혁신동': '703',
+  '안심1동': '703', '안심2동': '703', '안심3동': '703', '안심4동': '703', '안심동': '703',
+  '서호동': '703', '신서동': '703', '동호동': '703', '각산동': '703', '괴전동': '703', '숙천동': '703', '사복동': '703',
+  '방촌동': '807', '해안동': '807', '용계동': '807', '율하동': '807', '신기동': '807', '율암동': '807',
+  '신암1동': '707', '신암2동': '707', '신암3동': '707', '신암4동': '707', '신암5동': '707', '신암동': '707',
+  '신천1·2동': '707', '신천3동': '707', '신천4동': '707', '신천동': '707',
+  '효목1동': '707', '효목2동': '707', '효목동': '707',
+  '불로·봉무동': '707', '지저동': '707', '동촌동': '707', '도평동': '707', '공산동': '707',
+
+  // 2. 수성구 (시지/고산 -> 시지동 712, 지산/범물/황금/두산/파동 -> 지산동 702, 연호 -> 연호동 806, 만촌/범어/수성 -> 만촌동 709)
+  '고산1동': '712', '고산2동': '712', '고산3동': '712',
+  '시지동': '712', '노변동': '712', '신매동': '712', '매호동': '712', '사월동': '712', '욱수동': '712', '고산동': '712', '가천동': '712',
+  '지산1동': '702', '지산2동': '702', '지산동': '702',
+  '범물1동': '702', '범물2동': '702', '범물동': '702',
+  '두산동': '702', '황금1동': '702', '황금2동': '702', '황금동': '702', '상동': '702', '중동': '702', '파동': '702',
+  '연호동': '806', '이천동': '806', '삼덕동': '806',
+  '만촌1동': '709', '만촌2동': '709', '만촌3동': '709', '만촌동': '709',
+  '범어1동': '709', '범어2동': '709', '범어3동': '709', '범어4동': '709', '범어동': '709',
+  '수성1가동': '709', '수성2·3가동': '709', '수성4가동': '709', '수성동': '709',
+
+  // 3. 달서구 (월배/진천/상인/도원/대곡 -> 진천동 713, 본동/본리/송현/성당/감삼/죽전/두류/용산 -> 본동 715, 월성/호림/공단 -> 호림동 710, 성서/이곡/신당/장기 -> 이곡동 803)
+  '진천동': '713', '유천동': '713', '상인1동': '713', '상인2동': '713', '상인3동': '713', '상인동': '713', '도원동': '713', '대곡동': '713',
+  '본동': '715', '본리동': '715', '송현1동': '715', '송현2동': '715', '송현동': '715',
+  '성당동': '715', '감삼동': '715', '죽전동': '715', '두류1,2동': '715', '두류3동': '715', '두류동': '715',
+  '용산1동': '715', '용산2동': '715', '용산동': '715',
+  '월성1동': '710', '월성2동': '710', '월성동': '710',
+  '호림동': '710', '갈산동': '710', '파호동': '710', '호산동': '710', '대천동': '710', '월암동': '710',
+  '이곡1동': '803', '이곡2동': '803', '이곡동': '803', '신당동': '803', '장기동': '803', '장동': '803',
+
+  // 4. 서구 (평리/비산/원대 -> 평리동 802, 내당 -> 내당동 718, 상중이동/이현/중리 -> 이현동 704)
+  '평리1동': '802', '평리2동': '802', '평리3동': '802', '평리4동': '802', '평리5동': '802', '평리6동': '802', '평리동': '802',
+  '비산1동': '802', '비산2·3동': '802', '비산4동': '802', '비산5동': '802', '비산6동': '802', '비산7동': '802', '비산동': '802',
+  '원대동': '802',
+  '내당1동': '718', '내당2·3동': '718', '내당4동': '718', '내당동': '718',
+  '상중이동': '704', '이현동': '704', '중리동': '704', '상리동': '704',
+
+  // 5. 북구 (칠곡/태전/구암/관음/읍내/동천/국우/관문 -> 태전동 708, 무태조야/서변/동변/연경 -> 서변동 805, 침산/고성/노원/칠성 -> 침산동 719, 산격/복현/대현/검단 -> 산격동 716)
+  '태전1동': '708', '태전2동': '708', '태전동': '708',
+  '구암동': '708', '관음동': '708', '읍내동': '708', '동천동': '708', '국우동': '708', '관문동': '708', '학정동': '708', '매천동': '708', '팔달동': '708',
+  '무태조야동': '805', '서변동': '805', '동변동': '805', '연경동': '805', '조야동': '805', '노곡동': '805',
+  '침산1동': '719', '침산2동': '719', '침산3동': '719', '침산동': '719',
+  '고성동': '719', '노원동': '719', '칠성동': '719',
+  '산격1동': '716', '산격2동': '716', '산격3동': '716', '산격4동': '716', '산격동': '716',
+  '복현1동': '716', '복현2동': '716', '복현동': '716', '대현동': '716', '검단동': '716',
+
+  // 6. 남구 (봉덕/이천 -> 충혼탑 804, 대명 -> 대명동 705)
+  '봉덕1동': '804', '봉덕2동': '804', '봉덕3동': '804', '봉덕동': '804',
+  '이천동': '804',
+  '대명1동': '705', '대명2동': '705', '대명3동': '705', '대명4동': '705', '대명5동': '705',
+  '대명6동': '705', '대명9동': '705', '대명10동': '705', '대명11동': '705', '대명동': '705',
+
+  // 7. 달성군 (현풍/구지/유가 -> 유가읍 711, 화원/옥포/논공/가창 -> 화원읍 717, 다사/하빈 -> 다사읍 714)
+  '현풍읍': '711', '구지면': '711', '유가읍': '711',
+  '화원읍': '717', '옥포읍': '717', '논공읍': '717', '가창면': '717',
+  '다사읍': '714', '하빈면': '714',
+
+  // 8. 중구 (남산/대봉/동인/삼덕 -> 남산1동 720, 성내/대신/수창 -> 수창동 701)
+  '남산1동': '720', '남산2동': '720', '남산3동': '720', '남산4동': '720', '남산동': '720',
+  '대봉1동': '720', '대봉2동': '720', '대봉동': '720', '동인동': '720', '삼덕동': '720', '봉산동': '720',
+  '성내1동': '701', '성내2동': '701', '성내3동': '701', '대신동': '701',
+  '수창동': '701', '포정동': '701', '북성로': '701', '서성로': '701', '동성로': '701', '교동': '701', '태평로': '701', '달성동': '701',
+
+  // 9. 군위군 (군위읍 721)
+  '군위읍': '721', '소보면': '721', '효령면': '721', '부계면': '721', '우보면': '721', '의흥면': '721', '산성면': '721', '삼국유사면': '721'
+};
+
+function getStationForDong(district, dong = null) {
+  if (dong) {
+    const cleanDong = dong.trim();
+    // 1. 142개 행정동 이름 직접 정확 일치
+    if (dongToStationMap[cleanDong]) return dongToStationMap[cleanDong];
+
+    // 2. 특수기호/숫자 정규화 후 검색 (예: '신천1·2동' -> '신천동', '두류1,2동' -> '두류동')
+    const baseDong = cleanDong.replace(/[0-9·,동읍면가]/g, '');
+    for (const [k, code] of Object.entries(dongToStationMap)) {
+      if (cleanDong === k || cleanDong.includes(k) || (baseDong.length >= 2 && k.includes(baseDong))) {
+        return code;
+      }
+    }
+  }
+  return districtToStation[district] || '701';
+}
+
 
 // ==========================================================================
 // 대기질 4단계 등급별 공식 색상 정의 (AirKorea / 대구 실시간 대기정보 기준)
@@ -114,6 +201,7 @@ const defaultDistrictAirData = {
 };
 
 let currentDistrictAirData = { ...defaultDistrictAirData };
+let currentDongAirData = {};
 
 // PM10 및 PM2.5 수치 기반 4단계 통합 대기질 등급 (환경부 CAI 방식: 둘 중 더 나쁜 등급 적용)
 function getAirGrade(pm10, pm25 = null) {
@@ -209,12 +297,15 @@ async function fetchDistrictAirData(dateStr = currentAirDate, hourStr = currentA
     const result = await res.json();
     if (result.success && result.districts) {
       currentDistrictAirData = { ...defaultDistrictAirData, ...result.districts };
+      if (result.dongs) {
+        currentDongAirData = result.dongs;
+      }
       // 26개 전체 측정소 목록(또는 8개구 대표) 종합 표 렌더링
       const stationList = result.stations || Object.values(result.districts);
       renderDistrictSummary(stationList);
       // 26개 대기 측정소 실제 위치 핀(마커) 지도 표출
       renderStationMarkers(stationList);
-      // 지도 행정동 SVG 색상 갱신
+      // 지도 행정동 SVG 색상 갱신 (142개 읍·면·동 IDW 공간 보간 대기질 반영)
       if (leafletDongLayer) {
         leafletDongLayer.setStyle(getDongStyle);
       }
@@ -296,7 +387,7 @@ function renderStationMarkers(stations) {
         <div class="sttc-header">
           <div class="sttc-title">
             <span>${stName} 측정소</span>
-            <span style="font-size:0.7rem; color:#94a3b8; font-weight:normal;">(${sttn.sttn_cd})</span>
+            <span style="font-size: 1.0rem; color:#94a3b8; font-weight:normal;">(${sttn.sttn_cd})</span>
           </div>
           <span class="sttc-badge ${netClass}">${netLabel}</span>
         </div>
@@ -313,7 +404,7 @@ function renderStationMarkers(stations) {
             <strong class="sttc-grid-val" style="color: #a78bfa;">${pm25Val} <small>㎍/㎥</small></strong>
           </div>
         </div>
-        <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem;">
+        <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 1.0rem;">
           <span style="color: #94a3b8;">통합 대기질:</span>
           <span style="background: ${gradeColor}25; color: ${gradeColor}; border: 1px solid ${gradeColor}60; padding: 1px 6px; border-radius: 4px; font-weight: 700;">
             ${gradeText}
@@ -505,16 +596,18 @@ function updateDongHighlightOverlay(districtName, dongName = null) {
   }
 }
 
-// 동 폴리곤 스타일 계산 (미세먼지 좋음/보통/나쁨/매우나쁨 등급 기반 컬러링 및 실제 SVG 테두리 곡선 강조)
+// 동 폴리곤 스타일 계산 (142개 읍·면·동 IDW 정밀 대기질 등급 기반 컬러링 및 실제 SVG 테두리 곡선 강조)
 function getDongStyle(feature) {
   const dist = (feature.properties.district || '').trim();
   const dong = (feature.properties.dong || '').trim();
   const isSelectedDong = selectedDongName && (dong === selectedDongName.trim() || dong.includes(selectedDongName.trim())) && (!selectedDistrict || dist === selectedDistrict.trim());
   const isSelectedDist = selectedDistrict && dist === selectedDistrict.trim();
 
-  // 구(Gu) 고유색 대신 자치구의 미세먼지(PM10) 대기질 등급 색상 적용
-  const airInfo = currentDistrictAirData[dist] || defaultDistrictAirData[dist] || { pm10: 70, level: 2, text: '보통', color: '#10b981' };
-  const airColor = airInfo.color || '#10b981';
+  // 1. 행정동별 IDW 정밀 보간 데이터 우선 조회, 없으면 자치구 기본값 fallback
+  const dongKey = dist + '_' + dong;
+  const dongAir = currentDongAirData[dongKey] || currentDongAirData[dong] || null;
+  const distAir = currentDistrictAirData[dist] || defaultDistrictAirData[dist] || { pm10: 70, level: 2, text: '보통', color: '#10b981' };
+  const airColor = (dongAir && dongAir.color) ? dongAir.color : (distAir.color || '#10b981');
 
   // 1. 특정 동(Dong)이 선택된 경우: 내부 투명도(0.28) 유지 + 사이언 외곽선 강조
   if (isSelectedDong) {
@@ -553,28 +646,56 @@ function getDongStyle(feature) {
 
 // 각 동 폴리곤에 대한 이벤트 및 툴팁 바인딩
 function onEachDongFeature(feature, layer) {
-  const dong = feature.properties.dong;
-  const dist = feature.properties.district;
+  const dong = (feature.properties.dong || '').trim();
+  const dist = (feature.properties.district || '').trim();
   const fullName = feature.properties.fullName || `대구광역시 ${dist} ${dong}`;
 
-  const airInfo = currentDistrictAirData[dist] || defaultDistrictAirData[dist] || { pm10: 70, level: 2, text: '보통', color: '#10b981' };
+  function getDongAirInfo() {
+    const dongKey = dist + '_' + dong;
+    const dongAir = currentDongAirData[dongKey] || currentDongAirData[dong] || null;
+    const distAir = currentDistrictAirData[dist] || defaultDistrictAirData[dist] || { pm10: 70, pm25: 32, level: 2, text: '보통', color: '#10b981' };
+    
+    return {
+      pm10: (dongAir && dongAir.pm10 !== undefined) ? dongAir.pm10 : distAir.pm10,
+      pm25: (dongAir && dongAir.pm25 !== undefined) ? dongAir.pm25 : (distAir.pm25 || '-'),
+      text: (dongAir && dongAir.text) ? dongAir.text : distAir.text,
+      color: (dongAir && dongAir.color) ? dongAir.color : (distAir.color || '#10b981'),
+      nearest: (dongAir && dongAir.nearest_station) ? `${dongAir.nearest_station} (${dongAir.nearest_dist_km}km)` : ''
+    };
+  }
 
-  layer.bindTooltip(`
-    <div style="font-family: inherit;">
-      <div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc; margin-bottom: 3px;">
-        ${dist} <span style="color: #38bdf8;">${dong}</span>
+  function renderTooltipContent() {
+    const air = getDongAirInfo();
+    return `
+      <div style="font-family: inherit; min-width: 175px;">
+        <div style="font-weight: 700; font-size: 1.05rem; color: #f8fafc; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+          <span>${dist} <span style="color: #38bdf8;">${dong}</span></span>
+          <span style="background: ${air.color}25; color: ${air.color}; border: 1px solid ${air.color}80; padding: 1px 6px; border-radius: 4px; font-size: 1.0rem; font-weight: 700;">${air.text}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 1.0rem; color: #cbd5e1;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #94a3b8;">미세먼지 (PM10):</span>
+            <strong style="color: #38bdf8; font-size: 1.0rem;">${air.pm10} <small style="font-weight: normal; font-size: 1.0rem;">㎍/㎥</small></strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #94a3b8;">초미세먼지 (PM2.5):</span>
+            <strong style="color: #a78bfa; font-size: 1.0rem;">${air.pm25} <small style="font-weight: normal; font-size: 1.0rem;">㎍/㎥</small></strong>
+          </div>
+          ${air.nearest ? `
+          <div style="margin-top: 3px; padding-top: 3px; border-top: 1px dashed rgba(255,255,255,0.12); font-size: 1.0rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+            <span>기준 측정소:</span>
+            <span style="color: #e2e8f0; font-weight: 600;">${air.nearest}</span>
+          </div>` : ''}
+        </div>
       </div>
-      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: #cbd5e1;">
-        <span>미세먼지(PM10):</span>
-        <strong style="color: ${airInfo.color}; font-weight: 700;">${airInfo.pm10}㎍/㎥</strong>
-        <span style="background: ${airInfo.color}25; color: ${airInfo.color}; border: 1px solid ${airInfo.color}60; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 600;">${airInfo.text}</span>
-      </div>
-    </div>
-  `, {
+    `;
+  }
+
+  layer.bindTooltip(renderTooltipContent(), {
     sticky: true,
     className: 'dong-leaflet-tooltip',
     direction: 'auto',
-    opacity: 0.95
+    opacity: 0.98
   });
 
   // Leaflet 기본 _openTooltip 가로채기 (드래그/마우스누름/드래그 직후 툴팁 자동 팝업 원천 봉쇄)
@@ -602,18 +723,7 @@ function onEachDongFeature(feature, layer) {
       const l = e.target;
 
       // 최신 미세먼지 정보로 툴팁 실시간 반영
-      const latestAir = currentDistrictAirData[dist] || defaultDistrictAirData[dist] || { pm10: 70, level: 2, text: '보통', color: '#10b981' };
-      layer.setTooltipContent(`
-        <div style="font-family: inherit;">
-          <div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc; margin-bottom: 3px;">
-            ${dist} <span style="color: #38bdf8;">${dong}</span>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 2px; font-size: 0.74rem; color: #cbd5e1;">
-            <div>PM10: <strong style="color: #38bdf8;">${latestAir.pm10 || '-'}㎍/㎥</strong> | PM2.5: <strong style="color: #a78bfa;">${latestAir.pm25 || '-'}㎍/㎥</strong></div>
-            <div style="margin-top: 2px;"><span style="background: ${latestAir.color}25; color: ${latestAir.color}; border: 1px solid ${latestAir.color}60; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 600;">통합 ${latestAir.text}</span></div>
-          </div>
-        </div>
-      `);
+      layer.setTooltipContent(renderTooltipContent());
 
       if (currentlyHoveredDongLayer && currentlyHoveredDongLayer !== l) {
         if (leafletDongLayer) {
@@ -846,13 +956,19 @@ function updateAirUi(airData) {
   const latest = airData.latest;
   const sttnName = airData.station_name || '수창동(중구)';
 
+  // 전체 26개 측정소 목록(allStationsList)에서 실제 물리 농도(㎍/㎥) 조회
+  const matchedSttn = allStationsList.find(s => s.sttn_cd === airData.sttn_cd || (s.name && airData.station_name && airData.station_name.includes(s.name)));
+  
+  const displayPm10 = (matchedSttn && matchedSttn.pm10 !== undefined && matchedSttn.pm10 !== '-' && matchedSttn.pm10 !== null) ? matchedSttn.pm10 : (latest ? latest.pm10.value : '-');
+  const displayPm25 = (matchedSttn && matchedSttn.pm25 !== undefined && matchedSttn.pm25 !== '-' && matchedSttn.pm25 !== null) ? matchedSttn.pm25 : (latest ? latest.pm25.value : '-');
+
   // 1. 헤더 상단 라이브 칩
   const liveStation = document.getElementById('air-live-station');
   const livePm10 = document.getElementById('air-live-pm10');
   const livePm25 = document.getElementById('air-live-pm25');
   if (liveStation) liveStation.textContent = sttnName;
-  if (livePm10 && latest) livePm10.textContent = latest.pm10.value;
-  if (livePm25 && latest) livePm25.textContent = latest.pm25.value;
+  if (livePm10) livePm10.textContent = displayPm10;
+  if (livePm25) livePm25.textContent = displayPm25;
 
   // 2. 좌측 퀵 카드
   const qStation = document.getElementById('quick-air-station');
@@ -868,15 +984,17 @@ function updateAirUi(airData) {
   if (qStation) qStation.textContent = sttnName;
   if (latest) {
     if (qTime) qTime.textContent = `${latest.time.split(' ')[1]} 기준`;
-    if (qPm10Val) qPm10Val.textContent = latest.pm10.value;
+    if (qPm10Val) qPm10Val.textContent = displayPm10;
     if (qPm10Tag) {
-      qPm10Tag.textContent = latest.pm10.grade.text;
-      qPm10Tag.className = `qm-tag tag-${latest.pm10.grade.level === 1 ? 'good' : (latest.pm10.grade.level === 2 ? 'moderate' : 'bad')}`;
+      const g10 = getAirGradeFromPm10(displayPm10);
+      qPm10Tag.textContent = g10.text;
+      qPm10Tag.className = `qm-tag tag-${g10.level === 1 ? 'good' : (g10.level === 2 ? 'moderate' : 'bad')}`;
     }
-    if (qPm25Val) qPm25Val.textContent = latest.pm25.value;
+    if (qPm25Val) qPm25Val.textContent = displayPm25;
     if (qPm25Tag) {
-      qPm25Tag.textContent = latest.pm25.grade.text;
-      qPm25Tag.className = `qm-tag tag-${latest.pm25.grade.level === 1 ? 'good' : (latest.pm25.grade.level === 2 ? 'moderate' : 'bad')}`;
+      const g25 = getAirGrade(null, displayPm25);
+      qPm25Tag.textContent = g25.text;
+      qPm25Tag.className = `qm-tag tag-${g25.level === 1 ? 'good' : (g25.level === 2 ? 'moderate' : 'bad')}`;
     }
     if (qCaiVal) qCaiVal.textContent = latest.cai.value;
     if (qCaiSub) qCaiSub.textContent = latest.cai.substance || 'O3';
@@ -1025,7 +1143,7 @@ function renderDistrictSummary(stations) {
     return `
       <tr>
         <td style="font-weight: 700; color: var(--text-main);">${sttnName}</td>
-        <td style="color: var(--text-muted); font-size: 0.82rem;">${distName}</td>
+        <td style="color: var(--text-muted); font-size: 1.0rem;">${distName}</td>
         <td style="font-weight: 700; color: #38bdf8;">${pm10Val}</td>
         <td style="font-weight: 700; color: #a78bfa;">${pm25Val}</td>
         <td><span class="qm-tag" style="background:${color}25;color:${color};border:1px solid ${color}60;">
@@ -1058,8 +1176,8 @@ function selectDistrict(districtName, routeId = null) {
     }
   });
 
-  // 실시간 대기측정소 동기화
-  const targetStation = districtToStation[districtName];
+  // 실시간 대기측정소 동기화 (구 단위 대표 측정소)
+  const targetStation = getStationForDong(districtName, null);
   if (targetStation && targetStation !== currentStationCode) {
     fetchAirData(targetStation);
   }
@@ -1097,8 +1215,8 @@ function selectDistrictAndDong(districtName, dongName, fullName, routeId = null)
     }
   });
 
-  // 실시간 대기측정소 동기화
-  const targetStation = districtToStation[districtName];
+  // 실시간 대기측정소 동기화 (현풍/구지 등 동·읍·면별 가장 가까운 실제 측정소 정밀 매핑)
+  const targetStation = getStationForDong(districtName, dongName);
   if (targetStation && targetStation !== currentStationCode) {
     fetchAirData(targetStation);
   }
@@ -1198,39 +1316,58 @@ function renderDetailCard(districtName, dongName = null, fullName = null, routeI
   };
   const route = routeId ? (allRoutes.find(r => r.id === routeId) || allRoutes.find(r => r.district && r.district.includes(districtName))) : (allRoutes.find(r => r.district && r.district.includes(districtName)) || allRoutes[0]);
 
+  const assignedStationCode = getStationForDong(districtName, dongName);
+  const assignedStationName = stationCodeToDistrict[assignedStationCode] ? `${assignedStationCode} ${stationCodeToDistrict[assignedStationCode]}` : `${assignedStationCode} 측정소`;
+
+  const dongKey = districtName + '_' + (dongName || '');
+  const dongAir = (dongName && currentDongAirData) ? (currentDongAirData[dongKey] || currentDongAirData[dongName]) : null;
+  const airSummaryHtml = dongAir ? `
+    <div style="margin-top: 8px; font-size: 1.0rem; background: rgba(56, 189, 248, 0.08); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(56, 189, 248, 0.25); line-height: 1.4;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <span style="color: #38bdf8; font-weight: 700;">🌬️ 동별 정밀 대기질 (IDW):</span>
+        <span style="background: ${dongAir.color}25; color: ${dongAir.color}; border: 1px solid ${dongAir.color}80; padding: 1px 6px; border-radius: 4px; font-weight: 700;">${dongAir.text}</span>
+      </div>
+      <div style="color: #cbd5e1; font-size: 1.0rem;">
+        PM10 <strong style="color: #38bdf8;">${dongAir.pm10}㎍/㎥</strong> · PM2.5 <strong style="color: #a78bfa;">${dongAir.pm25}㎍/㎥</strong>
+        ${dongAir.nearest_station ? `<span style="color: #94a3b8;"> (기준: ${dongAir.nearest_station})</span>` : ''}
+      </div>
+    </div>
+  ` : '';
+
   tag.textContent = fullName ? fullName : `대구광역시 ${districtName} 관제 권역`;
   title.textContent = dongName ? `${districtName} ${dongName}` : (vehicle ? vehicle.name : `${districtName} 관리구역`);
 
   if (vehicle) {
     metrics.innerHTML = `
-      <div style="font-size: 0.76rem; color: var(--accent-blue); font-weight: 700; margin-bottom: 8px;">
+      <div style="font-size: 1.0rem; color: var(--accent-blue); font-weight: 700; margin-bottom: 8px;">
         🚛 권역 전담: ${vehicle.name} (${vehicle.model})
       </div>
       <div class="metric-grid">
         <div class="metric-item">
           <span class="metric-label">운행거리 단축</span>
           <strong class="metric-val text-accent">-${vehicle.improvement.distance_reduction_pct}%</strong>
-          <small style="font-size: 0.62rem; color: var(--text-muted);">${vehicle.before_stats.distance_km}km → ${vehicle.after_stats.distance_km}km</small>
+          <small style="font-size: 1.0rem; color: var(--text-muted);">${vehicle.before_stats.distance_km}km → ${vehicle.after_stats.distance_km}km</small>
         </div>
         <div class="metric-item">
           <span class="metric-label">소요시간 절감</span>
           <strong class="metric-val text-accent">-${vehicle.improvement.duration_reduction_pct}%</strong>
-          <small style="font-size: 0.62rem; color: var(--text-muted);">${vehicle.before_stats.duration_min}분 → ${vehicle.after_stats.duration_min}분</small>
+          <small style="font-size: 1.0rem; color: var(--text-muted);">${vehicle.before_stats.duration_min}분 → ${vehicle.after_stats.duration_min}분</small>
         </div>
         <div class="metric-item">
           <span class="metric-label">PM10 저감률</span>
           <strong class="metric-val text-emerald">-${vehicle.improvement.pm10_reduction_pct}%</strong>
-          <small style="font-size: 0.62rem; color: var(--text-muted);">${vehicle.before_stats.pm10_avg_after} → ${vehicle.after_stats.pm10_avg_after} ㎍/㎥</small>
+          <small style="font-size: 1.0rem; color: var(--text-muted);">${vehicle.before_stats.pm10_avg_after} → ${vehicle.after_stats.pm10_avg_after} ㎍/㎥</small>
         </div>
         <div class="metric-item">
           <span class="metric-label">분진 흡입 효율</span>
           <strong class="metric-val text-emerald">+${vehicle.improvement.dust_efficiency_gain_pct}%</strong>
-          <small style="font-size: 0.62rem; color: var(--text-muted);">${vehicle.after_stats.dust_collected_kg}kg 포집</small>
+          <small style="font-size: 1.0rem; color: var(--text-muted);">${vehicle.after_stats.dust_collected_kg}kg 포집</small>
         </div>
       </div>
-      <div style="margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-input); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--bg-border); line-height: 1.4;">
+      ${airSummaryHtml}
+      <div style="margin-top: 8px; font-size: 1.0rem; color: var(--text-muted); background: var(--bg-input); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--bg-border); line-height: 1.4;">
         📍 <strong>관제 노선:</strong> ${route ? route.name : (dongName ? `${districtName} ${dongName} 일대 도로` : `${districtName} 주요 도로망`)}<br>
-        ✨ <strong>대기 측정소:</strong> ${districtName} 대표 대기측정소(PM10) 실시간 동기화 완료
+        ✨ <strong>대기 측정소:</strong> ${assignedStationName} 실시간 동기화 완료
       </div>
     `;
   }
@@ -1342,24 +1479,24 @@ function initRoadLeafletMap() {
 
       const popupHtml = `
         <div style="min-width: 220px; font-family: inherit;">
-          <div style="font-size: 0.95rem; font-weight: 700; color: #c084fc; margin-bottom: 4px;">
+          <div style="font-size: 1.0rem; font-weight: 700; color: #c084fc; margin-bottom: 4px;">
             ${route.name}
           </div>
-          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 8px;">
+          <div style="font-size: 1.0rem; color: #94a3b8; margin-bottom: 8px;">
             관리 권역: <strong style="color: #f1f5f9;">${route.district || '대구광역시'}</strong>
             ${route.length_km ? ` · ${route.length_km}km` : ''}
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255,255,255,0.06); padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;">
             <div>
-              <div style="font-size: 0.68rem; color: #94a3b8;">흡입 전 미세먼지</div>
-              <div style="font-size: 0.95rem; font-weight: 700; color: #f87171;">${route.pm10_before || '-'} <small style="font-size: 0.65rem;">㎍/㎥</small></div>
+              <div style="font-size: 1.0rem; color: #94a3b8;">흡입 전 미세먼지</div>
+              <div style="font-size: 1.0rem; font-weight: 700; color: #f87171;">${route.pm10_before || '-'} <small style="font-size: 1.0rem;">㎍/㎥</small></div>
             </div>
             <div>
-              <div style="font-size: 0.68rem; color: #94a3b8;">흡입 후 미세먼지</div>
-              <div style="font-size: 0.95rem; font-weight: 700; color: #34d399;">${route.pm10_after_clean || '-'} <small style="font-size: 0.65rem;">㎍/㎥</small></div>
+              <div style="font-size: 1.0rem; color: #94a3b8;">흡입 후 미세먼지</div>
+              <div style="font-size: 1.0rem; font-weight: 700; color: #34d399;">${route.pm10_after_clean || '-'} <small style="font-size: 1.0rem;">㎍/㎥</small></div>
             </div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.0rem;">
             <span style="color: #94a3b8;">교통 밀집도:</span>
             <span style="color: #38bdf8; font-weight: 600;">${route.traffic_level || '보통'}</span>
           </div>

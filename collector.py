@@ -1,5 +1,6 @@
 import os
 import json
+import csv
 import ssl
 import urllib.request
 import urllib.parse
@@ -128,17 +129,42 @@ DISTRICT_STATION_MAP = {
     '달성군': {'sttn_cd': '714', 'name': '다사읍', 'fallbacks': ['711', '717']}
 }
 
-# 26개 측정소별 상세 위치(GPS 좌표, 주소, 측정망 유형, 설치년도) 로드
-_STATIONS_JSON_PATH = os.path.join(os.path.dirname(__file__), 'data', 'daegu_air_stations.json')
+# 26개 측정소별 상세 위치(GPS 좌표, 측정망 유형 등) data/stations.csv 로드
+_STATIONS_CSV_PATH = os.path.join(os.path.dirname(__file__), 'data', 'stations.csv')
 STATIONS_LOCATION_MAP = {}
-if os.path.exists(_STATIONS_JSON_PATH):
+if os.path.exists(_STATIONS_CSV_PATH):
     try:
-        with open(_STATIONS_JSON_PATH, 'r', encoding='utf-8') as f:
-            _st_list = json.load(f)
-            for _s in _st_list:
-                STATIONS_LOCATION_MAP[_s['sttn_cd']] = _s
+        with open(_STATIONS_CSV_PATH, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                st_name = (row.get('측정소명') or '').strip()
+                sttn_cd = STATION_NAME_TO_CODE.get(st_name, '')
+                if not sttn_cd:
+                    # 이름 부분일치 fallback
+                    for k, v in STATION_NAME_TO_CODE.items():
+                        if k in st_name or st_name in k:
+                            sttn_cd = v
+                            break
+                if sttn_cd:
+                    try:
+                        lat_val = float(row.get('위도', 0))
+                        lng_val = float(row.get('경도', 0))
+                    except (ValueError, TypeError):
+                        lat_val, lng_val = None, None
+
+                    STATIONS_LOCATION_MAP[sttn_cd] = {
+                        'sttn_cd': sttn_cd,
+                        'airkorea_code': (row.get('측정소코드') or '').strip(),
+                        'name': st_name,
+                        'station_name': STATION_NAMES.get(sttn_cd, st_name),
+                        'district': STATION_DISTRICT_MAP.get(sttn_cd, ''),
+                        'network': (row.get('측정망') or '도시대기').strip(),
+                        'lat': lat_val,
+                        'lng': lng_val
+                    }
+        print(f"[AirCollector] data/stations.csv 로드 완료: {len(STATIONS_LOCATION_MAP)}개 측정소")
     except Exception as e:
-        print(f"[AirCollector] 측정소 위치 데이터 로드 실패: {e}")
+        print(f"[AirCollector] data/stations.csv 로드 실패: {e}")
 
 def get_all_stations_locations():
     """26개 전체 측정소의 위치 및 메타데이터 목록 반환"""
@@ -300,6 +326,29 @@ def crawl_daegu_realtime_air(sttn_cd='701', date_str=None):
             return fallback_data
 
     latest_rec = parsed_records[-1] if parsed_records else None
+
+    # locationRealTimeView(실제 물리 농도 ㎍/㎥) 데이터를 latest_rec에 정확히 동기화
+    if latest_rec:
+        try:
+            all_sttns = crawl_all_stations_pm10(date_str=date_str)
+            if sttn_cd in all_sttns and all_sttns[sttn_cd]['pm10'] not in ('-', None, ''):
+                st_info = all_sttns[sttn_cd]
+                latest_rec['pm10']['value'] = str(st_info['pm10'])
+                latest_rec['pm10']['grade'] = {
+                    'level': st_info['pm10_level'],
+                    'text': st_info['pm10_text'],
+                    'color': st_info['pm10_color'],
+                    'icon': 'smile' if st_info['pm10_level'] <= 2 else 'frown'
+                }
+                latest_rec['pm25']['value'] = str(st_info['pm25'])
+                latest_rec['pm25']['grade'] = {
+                    'level': st_info['pm25_level'],
+                    'text': st_info['pm25_text'],
+                    'color': st_info['pm25_color'],
+                    'icon': 'smile' if st_info['pm25_level'] <= 2 else 'frown'
+                }
+        except Exception as e:
+            print(f"[AirCrawler] 실시간 농도 동기화 예외: {e}")
 
     result = {
         'sttn_cd': sttn_cd,
