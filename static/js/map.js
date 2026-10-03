@@ -154,10 +154,7 @@ const dongToStationMap = {
   '남산1동': '720', '남산2동': '720', '남산3동': '720', '남산4동': '720', '남산동': '720',
   '대봉1동': '720', '대봉2동': '720', '대봉동': '720', '동인동': '720', '삼덕동': '720', '봉산동': '720',
   '성내1동': '701', '성내2동': '701', '성내3동': '701', '대신동': '701',
-  '수창동': '701', '포정동': '701', '북성로': '701', '서성로': '701', '동성로': '701', '교동': '701', '태평로': '701', '달성동': '701',
-
-  // 9. 군위군 (군위읍 721)
-  '군위읍': '721', '소보면': '721', '효령면': '721', '부계면': '721', '우보면': '721', '의흥면': '721', '산성면': '721', '삼국유사면': '721'
+  '수창동': '701', '포정동': '701', '북성로': '701', '서성로': '701', '동성로': '701', '교동': '701', '태평로': '701', '달성동': '701'
 };
 
 function getStationForDong(district, dong = null) {
@@ -257,7 +254,6 @@ const stationCodeToDistrict = {
   '718': '서구',   // 내당동
   '719': '북구',   // 침산동
   '720': '중구',   // 남산1동
-  '721': '군위군', // 군위읍
   '802': '서구',   // 평리동
   '803': '달서구', // 이곡동
   '804': '남구',   // 충혼탑
@@ -268,7 +264,26 @@ const stationCodeToDistrict = {
 
 let currentAirHour = 'all';
 
+function getTodayIsoDate() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().split('T')[0];
+}
+
+function updateRealtimeBadgeVisibility(dateStr = currentAirDate, hourStr = currentAirHour) {
+  const badge = document.getElementById('header-realtime-badge');
+  if (!badge) return;
+  const todayStr = getTodayIsoDate();
+  const isPastOrSpecificHour = (dateStr && dateStr !== todayStr) || (hourStr && hourStr !== 'all');
+  if (isPastOrSpecificHour) {
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = 'inline-flex';
+  }
+}
+
 async function fetchDistrictAirData(dateStr = currentAirDate, hourStr = currentAirHour) {
+  updateRealtimeBadgeVisibility(dateStr, hourStr);
   const modal = document.getElementById('air-modal');
   const tbody = document.getElementById('district-summary-tbody');
   
@@ -333,7 +348,7 @@ async function fetchDistrictAirData(dateStr = currentAirDate, hourStr = currentA
 }
 
 // --------------------------------------------------------------------------
-// 1-2. 대구 26개 공식 대기 측정소 핀(마커) 지도 표출 & 툴팁 바인딩
+// 1-2. 대구 25개 공식 대기 측정소 핀(마커) 지도 표출 (도시대기 19개소 vs 도로변대기 6개소)
 // --------------------------------------------------------------------------
 function renderStationMarkers(stations) {
   if (!leafletMapInstance) return;
@@ -350,6 +365,32 @@ function renderStationMarkers(stations) {
     leafletStationLayerGroup.clearLayers();
   }
 
+  // 도시대기 (빌딩/도시) SVG 아이콘
+  const urbanIconSvg = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
+      <path d="M9 22v-4h6v4"/>
+      <path d="M8 6h.01"/>
+      <path d="M16 6h.01"/>
+      <path d="M12 6h.01"/>
+      <path d="M12 10h.01"/>
+      <path d="M12 14h.01"/>
+      <path d="M16 10h.01"/>
+      <path d="M16 14h.01"/>
+      <path d="M8 10h.01"/>
+      <path d="M8 14h.01"/>
+    </svg>`;
+
+  // 도로변대기 (도로/길) SVG 아이콘
+  const roadsideIconSvg = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 21L8 3"/>
+      <path d="M20 21L16 3"/>
+      <path d="M12 4v4"/>
+      <path d="M12 11v3"/>
+      <path d="M12 17v3"/>
+    </svg>`;
+
   stations.forEach(sttn => {
     const lat = sttn.lat;
     const lng = sttn.lng;
@@ -362,15 +403,19 @@ function renderStationMarkers(stations) {
     const cleanName = stName.replace(/\(.*?\)/, '').trim();
     const pm10Val = (sttn.pm10 !== undefined && sttn.pm10 !== null && sttn.pm10 !== '') ? sttn.pm10 : '-';
     const pm25Val = (sttn.pm25 !== undefined && sttn.pm25 !== null && sttn.pm25 !== '') ? sttn.pm25 : '-';
-    const gradeColor = sttn.color || '#10b981';
-    const gradeText = sttn.text || '보통';
+    
+    const gradeObj = (pm10Val === '-' || pm10Val === '점검중' || pm10Val === null) ? { level: 0, text: '점검중', color: '#94a3b8' } : getAirGrade(pm10Val, pm25Val);
+    const gradeColor = gradeObj.color;
+    const gradeText = (gradeObj.level === 0) ? '점검중' : gradeObj.text;
+
+    const iconContent = isRoadside ? roadsideIconSvg : urbanIconSvg;
 
     const customIcon = L.divIcon({
       className: 'custom-sttn-icon',
       html: `
-        <div class="station-pin-wrapper" title="${cleanName} 측정소 (${netLabel})">
+        <div class="station-pin-wrapper ${netClass}" title="${cleanName} (${netLabel}, PM10: ${pm10Val})">
           <div class="sttn-pin-body ${netClass}">
-            <div class="sttn-pin-icon-inner">📍</div>
+            <div class="sttn-pin-icon-inner">${iconContent}</div>
           </div>
           <span class="sttn-pin-label">${cleanName}</span>
         </div>

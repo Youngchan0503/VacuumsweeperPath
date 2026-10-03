@@ -1,6 +1,8 @@
 import os
 import json
 import csv
+import math
+import re
 import ssl
 import urllib.request
 import urllib.parse
@@ -65,7 +67,7 @@ def _cleanup_old_cache(keep_days: int = 2):
     except Exception as e:
         print(f"[AirCache] 캐시 정리 실패: {e}")
 
-# 대구광역시 보건환경연구원 공식 26개 측정소 사전 (sttn_cd -> 한글명 및 소속 구·군)
+# 대구광역시 보건환경연구원 공식 25개 측정소 사전 (sttn_cd -> 한글명 및 소속 구·군)
 STATION_NAMES = {
     '701': '수창동(중구)',
     '702': '지산동(수성구)',
@@ -86,7 +88,6 @@ STATION_NAMES = {
     '718': '내당동(서구)',
     '719': '침산동(북구)',
     '720': '남산1동(중구)',
-    '721': '군위읍(군위군)',
     '802': '평리동(서구)',
     '803': '이곡동(달서구)',
     '804': '충혼탑(남구)',
@@ -101,18 +102,18 @@ STATION_NAME_TO_CODE = {
     '대명동': '705', '신암동': '707', '태전동': '708', '만촌동': '709',
     '호림동': '710', '유가읍': '711', '시지동': '712', '진천동': '713',
     '다사읍': '714', '본동': '715',   '산격동': '716', '화원읍': '717',
-    '내당동': '718', '침산동': '719', '남산1동': '720', '군위읍': '721',
+    '내당동': '718', '침산동': '719', '남산1동': '720',
     '평리동': '802', '이곡동': '803', '충혼탑': '804', '서변동': '805',
     '연호동': '806', '용계동': '807'
 }
 
-# 26개 측정소별 소속 구·군 매핑
+# 25개 측정소별 소속 구·군 매핑
 STATION_DISTRICT_MAP = {
     '701': '중구',   '702': '수성구', '703': '동구',   '704': '서구',
     '705': '남구',   '707': '동구',   '708': '북구',   '709': '수성구',
     '710': '달서구', '711': '달성군', '712': '수성구', '713': '달서구',
     '714': '달성군', '715': '달서구', '716': '북구',   '717': '달성군',
-    '718': '서구',   '719': '북구',   '720': '중구',   '721': '군위군',
+    '718': '서구',   '719': '북구',   '720': '중구',
     '802': '서구',   '803': '달서구', '804': '남구',   '805': '북구',
     '806': '수성구', '807': '동구'
 }
@@ -129,7 +130,7 @@ DISTRICT_STATION_MAP = {
     '달성군': {'sttn_cd': '714', 'name': '다사읍', 'fallbacks': ['711', '717']}
 }
 
-# 26개 측정소별 상세 위치(GPS 좌표, 측정망 유형 등) data/stations.csv 로드
+# 25개 측정소별 상세 위치(GPS 좌표, 측정망 유형 등) data/stations.csv 로드
 _STATIONS_CSV_PATH = os.path.join(os.path.dirname(__file__), 'data', 'stations.csv')
 STATIONS_LOCATION_MAP = {}
 if os.path.exists(_STATIONS_CSV_PATH):
@@ -167,7 +168,7 @@ if os.path.exists(_STATIONS_CSV_PATH):
         print(f"[AirCollector] data/stations.csv 로드 실패: {e}")
 
 def get_all_stations_locations():
-    """26개 전체 측정소의 위치 및 메타데이터 목록 반환"""
+    """25개 전체 측정소의 위치 및 메타데이터 목록 반환"""
     return list(STATIONS_LOCATION_MAP.values())
 
 def load_daegu_data():
@@ -605,5 +606,238 @@ def get_all_districts_air_summary(date_str=None, hour_str=None):
             }
 
     return results
+
+
+# ==========================================================================
+# 142개 읍·면·동 IDW(역거리 가중법) 공간 보간 대기질 연산 모듈
+# (daegu_dust2.ipynb 규격 기반)
+# ==========================================================================
+
+_CACHED_DONGS = None
+
+def load_dong_centroids(geojson_path=None):
+    """142개 읍·면·동 GeoJSON 로드 및 대표 중심점(위경도) 계산"""
+    if geojson_path is None:
+        geojson_path = os.path.join(os.path.dirname(__file__), 'static', 'data', 'daegu_dong.geojson')
+    dongs = []
+    if not os.path.exists(geojson_path):
+        return dongs
+    try:
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        for feat in data.get('features', []):
+            props = feat.get('properties', {})
+            geom = feat.get('geometry', {})
+            dist = props.get('district', '')
+            dong = props.get('dong', '')
+            full_name = props.get('fullName', f"대구광역시 {dist} {dong}")
+            
+            coords = geom.get('coordinates', [])
+            gtype = geom.get('type', '')
+            all_pts = []
+            if gtype == 'Polygon':
+                for ring in coords:
+                    all_pts.extend(ring)
+            elif gtype == 'MultiPolygon':
+                for poly in coords:
+                    for ring in poly:
+                        all_pts.extend(ring)
+            
+            if all_pts:
+                avg_lng = sum(p[0] for p in all_pts) / len(all_pts)
+                avg_lat = sum(p[1] for p in all_pts) / len(all_pts)
+            else:
+                avg_lng, avg_lat = 128.6014, 35.8714
+            
+            dongs.append({
+                'district': dist,
+                'dong': dong,
+                'fullName': full_name,
+                'lat': avg_lat,
+                'lng': avg_lng
+            })
+    except Exception as e:
+        print(f"[AirCollector] GeoJSON 중심점 로드 실패: {e}")
+    return dongs
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    """Haversine 거리 공식 (km 단위)"""
+    R = 6371.0  # 지구 반지름 (km)
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+def calculate_dong_idw_air(station_values_map, stations_info, dong_list):
+    """
+    IDW 공간 보간 알고리즘 (daegu_dust2.ipynb 규격)
+    - PM10: 도시대기 측정망 우선 (k=20, power=1.5)
+    - PM2.5: 전체 측정망 (k=15, power=1.5)
+    """
+    results = {}
+    
+    valid_pm10_stations = []
+    valid_pm25_stations = []
+    
+    for s in stations_info:
+        name = s['name']
+        v = station_values_map.get(name) or {}
+        p10 = v.get('pm10')
+        p25 = v.get('pm25')
+        
+        # PM10: 도시대기 위주
+        if p10 is not None and str(p10) not in ('-', '', 'None'):
+            try:
+                num_p10 = float(p10)
+                if s.get('network') == '도시대기':
+                    valid_pm10_stations.append((s['lat'], s['lng'], num_p10, name))
+            except ValueError:
+                pass
+        
+        # PM2.5: 전체 측정망
+        if p25 is not None and str(p25) not in ('-', '', 'None'):
+            try:
+                num_p25 = float(p25)
+                valid_pm25_stations.append((s['lat'], s['lng'], num_p25, name))
+            except ValueError:
+                pass
+    
+    # fallback: 도시대기만으로 부족하면 전체 측정소 사용
+    if len(valid_pm10_stations) < 3:
+        for s in stations_info:
+            name = s['name']
+            v = station_values_map.get(name) or {}
+            p10 = v.get('pm10')
+            if p10 is not None and str(p10) not in ('-', '', 'None'):
+                try:
+                    num_p10 = float(p10)
+                    valid_pm10_stations.append((s['lat'], s['lng'], num_p10, name))
+                except ValueError:
+                    pass
+
+    def _idw(target_lat, target_lng, train_data, power=1.5, k=20):
+        if not train_data:
+            return None, None
+        
+        dist_list = []
+        for (lat, lng, val, name) in train_data:
+            d = haversine_km(target_lat, target_lng, lat, lng)
+            dist_list.append((d, val, name))
+        
+        dist_list.sort(key=lambda x: x[0])
+        actual_k = min(k, len(dist_list))
+        top_k = dist_list[:actual_k]
+        
+        for (d, val, name) in top_k:
+            if d < 0.05:  # 50m 이내
+                return val, dist_list[0]
+        
+        weights = [1.0 / (d ** power) for (d, val, name) in top_k]
+        sum_w = sum(weights)
+        if sum_w == 0:
+            return top_k[0][1], dist_list[0]
+        
+        pred = sum(w * v for w, (d, v, name) in zip(weights, top_k)) / sum_w
+        return pred, dist_list[0]
+
+    for d in dong_list:
+        dist = d['district']
+        dong = d['dong']
+        key = f"{dist}_{dong}"
+        
+        pred_pm10, nearest_pm10 = _idw(d['lat'], d['lng'], valid_pm10_stations, power=1.5, k=20)
+        pred_pm25, nearest_pm25 = _idw(d['lat'], d['lng'], valid_pm25_stations, power=1.5, k=15)
+        
+        final_pm10 = round(pred_pm10, 1) if pred_pm10 is not None else 65.0
+        final_pm25 = round(pred_pm25, 1) if pred_pm25 is not None else 32.0
+        
+        def _get_grade(v10, v25):
+            if v10 <= 30:   g10 = 1, '좋음',    '#3b82f6'
+            elif v10 <= 80: g10 = 2, '보통',    '#10b981'
+            elif v10 <= 150:g10 = 3, '나쁨',    '#f59e0b'
+            else:           g10 = 4, '매우나쁨', '#ef4444'
+            
+            if v25 <= 15:   g25 = 1, '좋음',    '#3b82f6'
+            elif v25 <= 35: g25 = 2, '보통',    '#10b981'
+            elif v25 <= 75: g25 = 3, '나쁨',    '#f59e0b'
+            else:           g25 = 4, '매우나쁨', '#ef4444'
+            
+            return g25 if g25[0] > g10[0] else g10
+        
+        lvl, txt, color = _get_grade(final_pm10, final_pm25)
+        
+        nearest_sttn_name = nearest_pm10[2] if nearest_pm10 else '대구측정소'
+        nearest_dist_km = round(nearest_pm10[0], 2) if nearest_pm10 else 0.0
+        
+        results[key] = {
+            'district': dist,
+            'dong': dong,
+            'fullName': d['fullName'],
+            'lat': d['lat'],
+            'lng': d['lng'],
+            'pm10': final_pm10,
+            'pm25': final_pm25,
+            'level': lvl,
+            'text': txt,
+            'color': color,
+            'nearest_station': nearest_sttn_name,
+            'nearest_dist_km': nearest_dist_km
+        }
+    
+    # CSV 저장 (daegu_dust2.ipynb 규격)
+    save_idw_to_csv(results)
+    return results
+
+def save_idw_to_csv(dong_idw_results, out_dir=None, out_filename='daegu_dong_realtime_idw.csv'):
+    """행정동별 IDW 보간 결과를 CSV로 저장"""
+    if out_dir is None:
+        out_dir = os.path.join(os.path.dirname(__file__), 'data', 'realtime_idw')
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, out_filename)
+        fieldnames = ['district', 'dong', 'fullName', 'lat', 'lng', 'PM10', 'PM2.5', 'level', 'text', 'color', 'nearest_station', 'nearest_dist_km']
+        with open(out_path, 'w', encoding='utf-8-sig', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for k, r in dong_idw_results.items():
+                writer.writerow({
+                    'district': r['district'],
+                    'dong': r['dong'],
+                    'fullName': r['fullName'],
+                    'lat': r['lat'],
+                    'lng': r['lng'],
+                    'PM10': r['pm10'],
+                    'PM2.5': r['pm25'],
+                    'level': r['level'],
+                    'text': r['text'],
+                    'color': r['color'],
+                    'nearest_station': r['nearest_station'],
+                    'nearest_dist_km': r['nearest_dist_km']
+                })
+        print(f"[AirCollector] {len(dong_idw_results)}개 행정동 IDW CSV 저장 완료 -> {out_path}")
+    except Exception as e:
+        print(f"[AirCollector] IDW CSV 저장 실패: {e}")
+
+def get_dong_idw_air(station_crawl_results):
+    """
+    크롤링한 25개 측정소 데이터를 받아 142개 읍·면·동별 IDW 대기질 산출
+    """
+    global _CACHED_DONGS
+    if _CACHED_DONGS is None:
+        _CACHED_DONGS = load_dong_centroids()
+    
+    stations_info = get_all_stations_locations()
+    
+    sttn_vals = {}
+    for sttn_cd, info in station_crawl_results.items():
+        st_name = info.get('station_name') or info.get('name') or ''
+        clean_name = re.sub(r'\(.*?\)', '', st_name).strip()
+        sttn_vals[clean_name] = {
+            'pm10': info.get('pm10'),
+            'pm25': info.get('pm25')
+        }
+    
+    return calculate_dong_idw_air(sttn_vals, stations_info, _CACHED_DONGS)
 
 

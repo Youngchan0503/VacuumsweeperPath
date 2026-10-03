@@ -46,23 +46,10 @@
       if (card) card.style.display = 'none';
       if (typeof window._realCloseDetailCard === 'function') window._realCloseDetailCard();
     };
-    window.toggleAirPanel = function() {
-      const body = document.getElementById('air-panel-body');
-      const icon = document.getElementById('panel-collapse-icon');
-      const header = document.getElementById('panel-toggle-header');
-      if (!body) return;
-      const isCollapsed = body.classList.toggle('collapsed');
-      if (icon) {
-        icon.style.transform = isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)';
-      }
-      if (header) {
-        header.classList.toggle('collapsed-header', isCollapsed);
-      }
-    };
   </script>
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261002_soft_border_v5" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261002_soft_border_v5';">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261003_network_pins_v8" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261003_network_pins_v8';">
 </head>
 <body>
 
@@ -78,7 +65,7 @@
           <h1 class="brand-title">대구 분진흡입차량 & 대기정보 관제</h1>
           <span class="brand-subtitle">Daegu Dust Suction & Real-time Air Quality</span>
         </div>
-        <div class="header-badge">
+        <div class="header-badge" id="header-realtime-badge">
           <span class="pulse-dot"></span>
           대구시 실시간 연동
         </div>
@@ -104,10 +91,6 @@
 
       <!-- 액션 버튼 -->
       <div class="header-actions">
-        <button class="action-btn" onclick="openAirModal()" title="air.daegu.go.kr 실시간 대기정보 테이블">
-          <i data-lucide="table"></i>
-          <span>대기정보 표</span>
-        </button>
         <button class="action-btn" id="btn-reset-view" title="전체 선택 초기화">
           <i data-lucide="rotate-ccw"></i>
         </button>
@@ -119,14 +102,11 @@
 
     <!-- 2. 좌측 플로팅 패널 -->
     <aside class="floating-panel" id="control-panel">
-      <div class="panel-header" id="panel-toggle-header" onclick="toggleAirPanel()" style="cursor:pointer; user-select:none;">
+      <div class="panel-header" id="panel-toggle-header">
         <div class="panel-title">
           <i data-lucide="activity"></i>
           <span id="panel-title-text">대구 실시간 대기현황</span>
         </div>
-        <button class="panel-collapse-btn" id="panel-collapse-btn" title="패널 접기/펼치기" onclick="event.stopPropagation(); toggleAirPanel()">
-          <i data-lucide="chevron-up" id="panel-collapse-icon"></i>
-        </button>
       </div>
 
       <div class="panel-body" id="air-panel-body">
@@ -138,20 +118,30 @@
           </label>
           <select id="station-select" class="custom-select">
             <option value="701">701 수창동 (중구)</option>
-            <option value="705">705 대명동 (남구)</option>
-            <option value="707">707 신암동 (동구)</option>
-            <option value="704">704 이현동 (서구)</option>
-            <option value="708">708 태전동 (북구)</option>
-            <option value="709">709 만촌동 (수성구)</option>
-            <option value="803">803 이곡동 (달서구)</option>
-            <option value="710">710 호림동 (달서구)</option>
-            <option value="714">714 다사읍 (달성군)</option>
             <option value="702">702 지산동 (수성구)</option>
             <option value="703">703 서호동 (동구)</option>
+            <option value="704">704 이현동 (서구)</option>
+            <option value="705">705 대명동 (남구)</option>
+            <option value="707">707 신암동 (동구)</option>
+            <option value="708">708 태전동 (북구)</option>
+            <option value="709">709 만촌동 (수성구)</option>
+            <option value="710">710 호림동 (달서구)</option>
             <option value="711">711 유가읍 (달성군)</option>
+            <option value="712">712 시지동 (수성구)</option>
+            <option value="713">713 진천동 (달서구)</option>
+            <option value="714">714 다사읍 (달성군)</option>
+            <option value="715">715 본동 (달서구)</option>
+            <option value="716">716 산격동 (북구)</option>
             <option value="717">717 화원읍 (달성군)</option>
+            <option value="718">718 내당동 (서구)</option>
             <option value="719">719 침산동 (북구)</option>
+            <option value="720">720 남산1동 (중구)</option>
             <option value="802">802 평리동 (서구)</option>
+            <option value="803">803 이곡동 (달서구)</option>
+            <option value="804">804 충혼탑 (남구)</option>
+            <option value="805">805 서변동 (북구)</option>
+            <option value="806">806 연호동 (수성구)</option>
+            <option value="807">807 용계동 (동구)</option>
           </select>
         </div>
 
@@ -191,10 +181,6 @@
               </div>
             </div>
           </div>
-          <button class="air-quick-btn" onclick="openAirModal()">
-            <i data-lucide="list"></i>
-            <span>시간대별 세부자료 보기 (air.daegu.go.kr)</span>
-          </button>
         </div>
 
         <!-- 데모용: 특정 날짜 대기 데이터 지도 반영 버튼 -->
@@ -235,7 +221,7 @@
           </div>
           <div class="legend-item">
             <span class="legend-pin-icon" style="background: #0ea5e9; border: 2px solid #ffffff; width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(14, 165, 233, 0.8);"></span>
-            <span>도시대기측정소 (20개소)</span>
+            <span>도시대기측정소 (19개소)</span>
           </div>
           <div class="legend-item">
             <span class="legend-pin-icon" style="background: #e11d48; border: 2px solid #ffffff; width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(225, 29, 72, 0.8);"></span>
@@ -289,7 +275,7 @@
           <i data-lucide="truck" class="nft-layer-icon"></i>
           <span>도로망 노선</span>
         </button>
-        <button class="nft-layer-item active" id="nft-layer-station" onclick="toggleNaverOverlay('stations')" title="대구 26개 실시간 대기 측정소 핀 위치 표시 (On/Off)">
+        <button class="nft-layer-item active" id="nft-layer-station" onclick="toggleNaverOverlay('stations')" title="대구 25개 실시간 대기 측정소 핀 위치 표시 (On/Off)">
           <span class="nft-dot"></span>
           <i data-lucide="map-pin" class="nft-layer-icon"></i>
           <span>측정소</span>
@@ -383,7 +369,7 @@
               <tbody id="district-summary-tbody">
                 <tr>
                   <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                    대구 26개 측정소 대기 정보를 불러오는 중입니다...
+                    대구 25개 측정소 대기 정보를 불러오는 중입니다...
                   </td>
                 </tr>
               </tbody>
@@ -411,7 +397,7 @@
   </div>
 
   <!-- 지도 및 실시간 대기 스크립트 (캐시 무효화 및 직접/Live Server 실행 폴백 지원) -->
-  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261002_sync_values_v17" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261002_sync_values_v17';"></script>
+  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261003_network_pins_v8" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261003_network_pins_v8';"></script>
   <script>
     if (window.lucide) {
       lucide.createIcons();

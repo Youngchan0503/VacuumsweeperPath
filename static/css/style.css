@@ -192,6 +192,9 @@ html, body {
 
 /* 실시간 대기 관제 라이브 칩 */
 .air-live-pill {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -201,12 +204,13 @@ html, body {
   border-radius: 9999px;
   cursor: pointer;
   transition: all var(--transition-fast);
+  z-index: 10;
 }
 
 .air-live-pill:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent-blue);
-  transform: translateY(-1px);
+  transform: translateX(-50%) translateY(-1px);
 }
 
 .air-pill-status {
@@ -1032,33 +1036,52 @@ html, body {
 
 .nft-layer-item.active {
   color: var(--text-main);
-  background: rgba(16, 185, 129, 0.16);
-  border-color: rgba(16, 185, 129, 0.45);
   font-weight: 700;
 }
 
-.nft-layer-item.active .nft-dot {
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+/* 1. 행정구역 레이어 버튼: 파란색/사이언 (Blue/Cyan) */
+#nft-layer-dist.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.55);
 }
 
-.nft-layer-item.active .nft-layer-icon {
-  color: #10b981;
+#nft-layer-dist.active .nft-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
 }
 
-/* 도로망 노선 레이어 버튼은 보라색 네온으로 차별화 */
+#nft-layer-dist.active .nft-layer-icon {
+  color: #38bdf8;
+}
+
+/* 2. 도로망 노선 레이어 버튼: 퍼플 (Purple) */
 #nft-layer-route.active {
-  background: rgba(168, 85, 247, 0.16);
-  border-color: rgba(168, 85, 247, 0.45);
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.55);
 }
 
 #nft-layer-route.active .nft-dot {
-  background: #a855f7;
-  box-shadow: 0 0 8px #a855f7;
+  background: #c084fc;
+  box-shadow: 0 0 8px #c084fc;
 }
 
 #nft-layer-route.active .nft-layer-icon {
   color: #c084fc;
+}
+
+/* 3. 측정소 레이어 버튼: 핫핑크/로즈 (Neon Pink) */
+#nft-layer-station.active {
+  background: rgba(236, 72, 153, 0.18);
+  border-color: rgba(236, 72, 153, 0.55);
+}
+
+#nft-layer-station.active .nft-dot {
+  background: #f472b6;
+  box-shadow: 0 0 8px #f472b6;
+}
+
+#nft-layer-station.active .nft-layer-icon {
+  color: #f472b6;
 }
 
 /* 동 폴리곤 툴팁 스타일 */
@@ -1230,8 +1253,8 @@ path.selected-dong-neon-path {
 }
 
 .air-modal-container {
-  width: 100%;
-  max-width: 1200px;
+  width: 96vw;
+  max-width: 1460px;
   max-height: 90vh;
   background: var(--bg-card);
   border: 1px solid var(--bg-border);
@@ -1249,12 +1272,12 @@ path.selected-dong-neon-path {
 }
 
 .air-modal-header {
-  padding: 16px 20px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--bg-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
   background: var(--bg-card);
 }
 
@@ -1262,6 +1285,8 @@ path.selected-dong-neon-path {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .amh-icon {
@@ -1273,24 +1298,30 @@ path.selected-dong-neon-path {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .amh-title {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-main);
+  white-space: nowrap;
 }
 
 .amh-sub {
-  font-size: 1.0rem;
+  font-size: 0.92rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .amh-controls {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .modal-control-group {
@@ -1298,6 +1329,7 @@ path.selected-dong-neon-path {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .modal-control-group label {
@@ -1321,6 +1353,12 @@ path.selected-dong-neon-path {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.amh-buttons .action-btn {
+  white-space: nowrap;
 }
 
 .modal-sttn-select {
@@ -1583,7 +1621,7 @@ path.selected-dong-neon-path {
 }
 
 .station-pin-wrapper:hover {
-  transform: translateY(-4px) scale(1.15);
+  transform: translateY(-4px) scale(1.18);
   z-index: 9999 !important;
 }
 
@@ -1609,25 +1647,21 @@ path.selected-dong-neon-path {
 
 .sttn-pin-icon-inner {
   transform: rotate(45deg);
-  width: 12px;
-  height: 12px;
-  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  font-weight: 800;
+  color: #ffffff;
 }
 
 .sttn-pin-label {
   position: absolute;
   top: 28px;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   color: #f8fafc;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
-  font-size: 1.0rem;
+  font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
