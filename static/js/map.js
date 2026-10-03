@@ -14,7 +14,7 @@ let currentNaverBaseMap = 'clean'; // 'clean' 또는 'satellite'
 let currentStationCode = '701'; // 기본: 수창동(중구)
 
 // 네이버 지도 스타일 오버레이 토글 상태
-let isDistrictOverlayOn = true;
+let isDistrictOverlayOn = false;
 let isRoutesOverlayOn = true;
 let isStationsOverlayOn = true;
 
@@ -580,6 +580,11 @@ async function loadDaeguDongGeoJson() {
     if (selectedDistrict) {
       leafletDongLayer.setStyle(getDongStyle);
     }
+
+    // 15개 운행구간(Zone) 시각화 초기화
+    if (typeof init15ZoneVisualization === 'function') {
+      init15ZoneVisualization();
+    }
   } catch (err) {
     console.error('대구 행정구역 GeoJSON 로드 실패:', err);
   }
@@ -884,6 +889,19 @@ function setNaverBaseMap(type) {
 function toggleNaverOverlay(type) {
   if (type === 'district') {
     isDistrictOverlayOn = !isDistrictOverlayOn;
+
+    // 상호 배타적 제어: 행정구역을 켜면 운행구간(12개 권역)을 자동으로 끔
+    if (isDistrictOverlayOn) {
+      if (typeof isZoneOverlayVisible !== 'undefined' && isZoneOverlayVisible) {
+        isZoneOverlayVisible = false;
+        if (leafletMapInstance) {
+          if (zonePolygonLayerGroup && leafletMapInstance.hasLayer(zonePolygonLayerGroup)) leafletMapInstance.removeLayer(zonePolygonLayerGroup);
+          if (zoneCorridorGroup && leafletMapInstance.hasLayer(zoneCorridorGroup)) leafletMapInstance.removeLayer(zoneCorridorGroup);
+          if (zoneLabelLayerGroup && leafletMapInstance.hasLayer(zoneLabelLayerGroup)) leafletMapInstance.removeLayer(zoneLabelLayerGroup);
+        }
+      }
+    }
+
     if (leafletMapInstance) {
       if (isDistrictOverlayOn) {
         if (leafletDongLayer && !leafletMapInstance.hasLayer(leafletDongLayer)) {
@@ -924,6 +942,32 @@ function toggleNaverOverlay(type) {
         }
       }
     }
+  } else if (type === 'zones') {
+    if (typeof isZoneOverlayVisible !== 'undefined') {
+      isZoneOverlayVisible = !isZoneOverlayVisible;
+
+      // 상호 배타적 제어: 운행구간(12개 권역)을 켜면 행정구역을 자동으로 끔
+      if (isZoneOverlayVisible) {
+        if (isDistrictOverlayOn) {
+          isDistrictOverlayOn = false;
+          if (leafletMapInstance && leafletDongLayer && leafletMapInstance.hasLayer(leafletDongLayer)) {
+            leafletMapInstance.removeLayer(leafletDongLayer);
+          }
+        }
+      }
+
+      if (leafletMapInstance) {
+        if (isZoneOverlayVisible) {
+          if (zonePolygonLayerGroup && !leafletMapInstance.hasLayer(zonePolygonLayerGroup)) zonePolygonLayerGroup.addTo(leafletMapInstance);
+          if (zoneCorridorGroup && !leafletMapInstance.hasLayer(zoneCorridorGroup)) zoneCorridorGroup.addTo(leafletMapInstance);
+          if (zoneLabelLayerGroup && !leafletMapInstance.hasLayer(zoneLabelLayerGroup)) zoneLabelLayerGroup.addTo(leafletMapInstance);
+        } else {
+          if (zonePolygonLayerGroup && leafletMapInstance.hasLayer(zonePolygonLayerGroup)) leafletMapInstance.removeLayer(zonePolygonLayerGroup);
+          if (zoneCorridorGroup && leafletMapInstance.hasLayer(zoneCorridorGroup)) leafletMapInstance.removeLayer(zoneCorridorGroup);
+          if (zoneLabelLayerGroup && leafletMapInstance.hasLayer(zoneLabelLayerGroup)) leafletMapInstance.removeLayer(zoneLabelLayerGroup);
+        }
+      }
+    }
   }
 
   if (leafletMapInstance && leafletRouteLayerGroup && leafletMapInstance.hasLayer(leafletRouteLayerGroup)) {
@@ -946,6 +990,7 @@ function updateNaverControlsUI() {
   const nftDist = document.getElementById('nft-layer-dist');
   const nftRoute = document.getElementById('nft-layer-route');
   const nftStation = document.getElementById('nft-layer-station');
+  const nftZone = document.getElementById('nft-layer-zone');
 
   const isClean = currentMasterView === 'clean';
   const isSat = currentMasterView === 'satellite';
@@ -965,6 +1010,9 @@ function updateNaverControlsUI() {
   if (nftRoute) nftRoute.classList.toggle('active', isRoutesOverlayOn);
 
   if (nftStation) nftStation.classList.toggle('active', isStationsOverlayOn);
+  if (nftZone && typeof isZoneOverlayVisible !== 'undefined') {
+    nftZone.classList.toggle('active', isZoneOverlayVisible);
+  }
 
   if (window.lucide) {
     lucide.createIcons();
@@ -1411,7 +1459,7 @@ function renderDetailCard(districtName, dongName = null, fullName = null, routeI
       </div>
       ${airSummaryHtml}
       <div style="margin-top: 8px; font-size: 1.0rem; color: var(--text-muted); background: var(--bg-input); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--bg-border); line-height: 1.4;">
-        📍 <strong>관제 노선:</strong> ${route ? route.name : (dongName ? `${districtName} ${dongName} 일대 도로` : `${districtName} 주요 도로망`)}<br>
+        📍 <strong>관제 권역:</strong> ${dongName ? `${districtName} ${dongName} 일대 관제 도로망` : `${districtName} 전역 주요 도로망`}<br>
         ✨ <strong>대기 측정소:</strong> ${assignedStationName} 실시간 동기화 완료
       </div>
     `;
@@ -1449,17 +1497,8 @@ function resetSelection() {
     leafletDongLayer.setStyle(getDongStyle);
   }
 
-  if (leafletMapInstance && leafletRoutePolylines && leafletRoutePolylines.length > 0) {
-    const allBounds = [];
-    leafletRoutePolylines.forEach(p => {
-      p.setStyle({ color: '#a855f7', weight: 5.2, opacity: 0.9 });
-      if (p.routeData && p.routeData.points) {
-        p.routeData.points.forEach(pt => allBounds.push(pt));
-      }
-    });
-    if (allBounds.length > 0) {
-      leafletMapInstance.fitBounds(allBounds, { padding: [60, 60], maxZoom: 13 });
-    }
+  if (leafletMapInstance) {
+    leafletMapInstance.setView([35.8714, 128.6014], 11.5);
   }
 }
 
@@ -1478,9 +1517,10 @@ function initRoadLeafletMap() {
   // 대구 중심 좌표
   leafletMapInstance = L.map('map', {
     center: [35.8714, 128.6014],
-    zoom: 12,
+    zoom: 11.5,
     zoomControl: false
   });
+  window.leafletMapInstance = leafletMapInstance;
 
   // 1. 일반 도로 타일 (OpenStreetMap 기반 다크 필터, API 키 불필요)
   darkOSMTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1502,109 +1542,88 @@ function initRoadLeafletMap() {
   // 줌 컨트롤 (우측 하단)
   L.control.zoom({ position: 'bottomright' }).addTo(leafletMapInstance);
 
-  // 도로망 노선 레이어 그룹
+  // 12개 운행구간 전담 도로망 노선 레이어 그룹 (초기화)
   leafletRouteLayerGroup = L.featureGroup();
   leafletRoutePolylines = [];
-  const allBounds = [];
 
-  allRoutes.forEach(route => {
-    if (route.points && route.points.length > 0) {
-      route.points.forEach(pt => allBounds.push(pt));
+  if (allRoutes && allRoutes.length > 0) {
+    allRoutes.forEach(route => {
+      if (route.points && route.points.length > 0) {
+        const routeColor = route.color || '#a855f7';
+        const poly = L.polyline(route.points, {
+          color: routeColor,
+          weight: 4.8,
+          opacity: 0.9,
+          lineJoin: 'round',
+          lineCap: 'round'
+        });
+        poly.routeData = route;
 
-      // 대기현황 색상(파랑/초록/주황/빨강)과 뚜렷이 구별되는 네온 바이올렛(#a855f7)
-      const poly = L.polyline(route.points, {
-        color: '#a855f7',
-        weight: 5.2,
-        opacity: 0.9,
-        lineJoin: 'round',
-        lineCap: 'round'
-      });
-
-      poly.routeData = route;
-
-      const popupHtml = `
-        <div style="min-width: 220px; font-family: inherit;">
-          <div style="font-size: 1.0rem; font-weight: 700; color: #c084fc; margin-bottom: 4px;">
-            ${route.name}
-          </div>
-          <div style="font-size: 1.0rem; color: #94a3b8; margin-bottom: 8px;">
-            관리 권역: <strong style="color: #f1f5f9;">${route.district || '대구광역시'}</strong>
-            ${route.length_km ? ` · ${route.length_km}km` : ''}
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255,255,255,0.06); padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;">
-            <div>
-              <div style="font-size: 1.0rem; color: #94a3b8;">흡입 전 미세먼지</div>
-              <div style="font-size: 1.0rem; font-weight: 700; color: #f87171;">${route.pm10_before || '-'} <small style="font-size: 1.0rem;">㎍/㎥</small></div>
+        const popupHtml = `
+          <div style="min-width: 230px; font-family: inherit;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <span style="background: ${routeColor}25; color: ${routeColor}; border: 1px solid ${routeColor}; font-size: 0.85rem; font-weight: 800; padding: 1px 6px; border-radius: 4px;">
+                ${route.zone_code || '구간'}
+              </span>
+              <div style="font-size: 0.95rem; font-weight: 700; color: #f1f5f9;">
+                ${route.name}
+              </div>
             </div>
-            <div>
-              <div style="font-size: 1.0rem; color: #94a3b8;">흡입 후 미세먼지</div>
-              <div style="font-size: 1.0rem; font-weight: 700; color: #34d399;">${route.pm10_after_clean || '-'} <small style="font-size: 1.0rem;">㎍/㎥</small></div>
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">
+              관제 권역: <strong style="color: #f8fafc;">${route.district}</strong> · 총연장 <strong>${route.length_km}km</strong>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 6px; margin-bottom: 8px;">
+              <div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">흡입 전 미세먼지</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #f87171;">${route.pm10_before || '-'} <small style="font-size: 0.75rem;">㎍/㎥</small></div>
+              </div>
+              <div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">흡입 후 미세먼지</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #34d399;">${route.pm10_after_clean || '-'} <small style="font-size: 0.75rem;">㎍/㎥</small></div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+              <span style="color: #94a3b8;">교통 혼잡도:</span>
+              <span style="color: #38bdf8; font-weight: 600;">${route.traffic_level || '보통'}</span>
             </div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 1.0rem;">
-            <span style="color: #94a3b8;">교통 밀집도:</span>
-            <span style="color: #38bdf8; font-weight: 600;">${route.traffic_level || '보통'}</span>
-          </div>
-        </div>
-      `;
+        `;
 
-      poly.bindPopup(popupHtml);
+        poly.bindPopup(popupHtml);
 
-      poly.on('mouseover', function () {
-        if (isMapMouseDown || isMapDragging) return;
-        this.setStyle({ color: '#ffffff', weight: 8, opacity: 1 });
-      });
-      poly.on('mouseout', function () {
-        if (selectedRouteId) {
-          if (this.routeData && this.routeData.id === selectedRouteId) {
-            this.setStyle({ color: '#c084fc', weight: 8.5, opacity: 1 });
+        poly.on('mouseover', function () {
+          if (isMapMouseDown || isMapDragging) return;
+          this.setStyle({ color: '#ffffff', weight: 7.5, opacity: 1 });
+        });
+
+        poly.on('mouseout', function () {
+          const color = this.routeData ? (this.routeData.color || '#a855f7') : '#a855f7';
+          if (selectedRouteId && this.routeData && this.routeData.id === selectedRouteId) {
+            this.setStyle({ color: color, weight: 8, opacity: 1 });
           } else {
-            this.setStyle({ color: '#7e22ce', weight: 3.5, opacity: 0.35 });
+            this.setStyle({ color: color, weight: 4.8, opacity: 0.9 });
           }
-        } else if (selectedDistrict) {
-          if (this.routeData && this.routeData.district && this.routeData.district.includes(selectedDistrict)) {
-            this.setStyle({ color: '#c084fc', weight: 7.5, opacity: 1 });
-          } else {
-            this.setStyle({ color: '#7e22ce', weight: 4, opacity: 0.55 });
+        });
+
+        poly.on('click', function (e) {
+          if (route.zone_id && typeof selectZone === 'function') {
+            selectZone(route.zone_id);
+          } else if (route.district) {
+            selectDistrict(route.district.split('/')[0]);
           }
-        } else {
-          this.setStyle({ color: '#a855f7', weight: 5.2, opacity: 0.9 });
-        }
-      });
-      poly.on('mousedown', function (e) {
-        this._mouseDownTime = Date.now();
-        this._mouseDownPos = e.containerPoint;
-      });
-      poly.on('click', function (e) {
-        const duration = Date.now() - (this._mouseDownTime || 0);
-        let dist = 0;
-        if (this._mouseDownPos && e.containerPoint) {
-          dist = this._mouseDownPos.distanceTo(e.containerPoint);
-        }
-        if (isMapDragging || duration > 280 || dist > 5) {
-          return;
-        }
-        selectedRouteId = route.id;
-        if (route.district) {
-          const firstDist = route.district.split('/')[0];
-          selectDistrict(firstDist, route.id);
-        } else {
-          highlightLeafletDistrict(null, route.id);
-        }
-      });
+        });
 
-      poly.addTo(leafletRouteLayerGroup);
-      leafletRoutePolylines.push(poly);
-    }
-  });
-
-  if (isRoutesOverlayOn) {
-    leafletRouteLayerGroup.addTo(leafletMapInstance);
+        poly.addTo(leafletRouteLayerGroup);
+        leafletRoutePolylines.push(poly);
+      }
+    });
   }
 
-  // 대구 전역 노선이 한눈에 들어오도록 자동 줌 맞춤
-  if (allBounds.length > 0) {
-    leafletMapInstance.fitBounds(allBounds, { padding: [60, 60], maxZoom: 13 });
+  window.leafletRoutePolylines = leafletRoutePolylines;
+  window.leafletRouteLayerGroup = leafletRouteLayerGroup;
+
+  if (isRoutesOverlayOn && leafletRoutePolylines.length > 0) {
+    leafletRouteLayerGroup.addTo(leafletMapInstance);
   }
 
   // 지도 마우스 인터랙션 제어 (드래그/홀드 시 툴팁 및 잔여 호버 원천 차단)

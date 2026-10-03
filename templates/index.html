@@ -49,7 +49,7 @@
   </script>
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261003_network_pins_v8" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261003_network_pins_v8';">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261003_pure_15zones_v13" onerror="this.onerror=null; this.href='../static/css/style.css?v=20261003_pure_15zones_v13';">
 </head>
 <body>
 
@@ -231,19 +231,8 @@
       </div>
     </aside>
 
-    <!-- 3. 우측 하단 상세 정보 카드 (구·군 분진차량 & 도로 개선도) -->
-    <div class="route-detail-card" id="detail-card">
-      <div class="card-close" onclick="closeDetailCard()">
-        <i data-lucide="x"></i>
-      </div>
-      <div class="card-header">
-        <span class="card-tag" id="detail-tag">대구광역시 관제 권역</span>
-        <h3 class="card-title" id="detail-title">수성구</h3>
-      </div>
-      <div class="card-metrics" id="detail-metrics">
-        <!-- JS로 동적 렌더링 -->
-      </div>
-    </div>
+    <!-- 3. 우측 하단 15개 분진흡입 운행구간 관제 카드 -->
+    <div class="zone-dashboard-card" id="zone-dashboard-card"></div>
 
     <!-- 4. 실시간 인터랙티브 지도 (일반/위성사진 토글 + 행정구역 & 도로망 투명 오버레이) -->
     <div id="road-view" class="map-viewport">
@@ -263,17 +252,22 @@
           <span>위성사진</span>
         </button>
       </div>
-      <!-- 2. 오버레이 레이어 토글: [행정구역] [도로망 노선] [측정소 핀] -->
+      <!-- 2. 오버레이 레이어 토글: [행정구역] [운행구간(13)] [구간 노선망(13)] [측정소] -->
       <div class="nft-layer-wrap">
-        <button class="nft-layer-item active" id="nft-layer-dist" onclick="toggleNaverOverlay('district')" title="대구 자치구 & 142개 읍·면·동 행정구역 경계 표시 (On/Off)">
+        <button class="nft-layer-item" id="nft-layer-dist" onclick="toggleNaverOverlay('district')" title="대구 자치구 & 142개 읍·면·동 행정구역 경계 표시 (On/Off)">
           <span class="nft-dot"></span>
           <i data-lucide="shapes" class="nft-layer-icon"></i>
           <span>행정구역</span>
         </button>
-        <button class="nft-layer-item active" id="nft-layer-route" onclick="toggleNaverOverlay('routes')" title="대구 분진흡입차량 14개 운행 노선 표시 (On/Off)">
+        <button class="nft-layer-item active" id="nft-layer-zone" onclick="toggleNaverOverlay('zones')" title="대구 13개 분진흡입 운행구간 & 번호 배지 표시 (On/Off)">
+          <span class="nft-dot"></span>
+          <i data-lucide="layers" class="nft-layer-icon"></i>
+          <span>운행구간(13)</span>
+        </button>
+        <button class="nft-layer-item active" id="nft-layer-route" onclick="toggleNaverOverlay('routes')" title="대구 13개 운행구간별 전담 도로망 노선 표시 (On/Off)">
           <span class="nft-dot"></span>
           <i data-lucide="truck" class="nft-layer-icon"></i>
-          <span>도로망 노선</span>
+          <span>구간 노선망(13)</span>
         </button>
         <button class="nft-layer-item active" id="nft-layer-station" onclick="toggleNaverOverlay('stations')" title="대구 25개 실시간 대기 측정소 핀 위치 표시 (On/Off)">
           <span class="nft-dot"></span>
@@ -396,8 +390,9 @@
 
   </div>
 
-  <!-- 지도 및 실시간 대기 스크립트 (캐시 무효화 및 직접/Live Server 실행 폴백 지원) -->
-  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261003_network_pins_v8" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261003_network_pins_v8';"></script>
+  <!-- 지도 및 13개 최적 균형 운행구간 & 실시간 대기 스크립트 -->
+  <script src="{{ url_for('static', filename='js/zones.js') }}?v=20261003_strict_boundaries_v1" onerror="this.onerror=null; this.src='../static/js/zones.js?v=20261003_strict_boundaries_v1';"></script>
+  <script src="{{ url_for('static', filename='js/map.js') }}?v=20261003_strict_boundaries_v1" onerror="this.onerror=null; this.src='../static/js/map.js?v=20261003_strict_boundaries_v1';"></script>
   <script>
     if (window.lucide) {
       lucide.createIcons();
